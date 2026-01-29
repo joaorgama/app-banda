@@ -73,10 +73,23 @@ else:
     role = user_data['role']
     username_clean = user_data['username'].lower().strip()
 
-    # --- 1. DIREÇÃO (COM GESTÃO DE EVENTOS) ---
+    # --- FUNÇÃO PARA RENDERIZAR GALERIA ---
+    def mostrar_galeria(lista_eventos):
+        st.subheader("🖼️ Galeria de Cartazes")
+        cartazes = [ev for ev in lista_eventos if ev.get('Cartaz') and str(ev['Cartaz']).startswith('http')]
+        
+        if cartazes:
+            cols = st.columns(2)  # Cria 2 colunas para telemóvel
+            for idx, ev in enumerate(cartazes):
+                with cols[idx % 2]:
+                    st.image(ev['Cartaz'], caption=f"{ev.get('Nome do Evento')} ({ev.get('Data')})", use_container_width=True)
+        else:
+            st.info("Ainda não existem links de cartazes na tabela Eventos.")
+
+    # --- 1. DIREÇÃO ---
     if role == "Direcao":
         st.title("🛡️ Gestão Direção")
-        t1, t2 = st.tabs(["📅 Eventos", "🏫 Escola Geral"])
+        t1, t2, t3 = st.tabs(["📅 Eventos", "🏫 Escola Geral", "🖼️ Galeria"])
         
         with t1:
             st.subheader("Gestão de Eventos")
@@ -85,32 +98,31 @@ else:
                     nome_ev = st.text_input("Nome do Evento")
                     data_ev = st.date_input("Data")
                     tipo_ev = st.selectbox("Tipo", ["Concerto", "Ensaio", "Arruada", "Outro"])
+                    link_cartaz = st.text_input("URL do Cartaz (Link da Imagem)")
                     if st.form_submit_button("Criar Evento"):
-                        base.append_row("Eventos", {"Nome do Evento": nome_ev, "Data": str(data_ev), "Tipo": tipo_ev})
-                        st.success("Evento criado!")
-                        time.sleep(1)
+                        base.append_row("Eventos", {"Nome do Evento": nome_ev, "Data": str(data_ev), "Tipo": tipo_ev, "Cartaz": link_cartaz})
                         st.rerun()
 
             evs_data = base.list_rows("Eventos")
             if evs_data:
                 df_evs = pd.DataFrame(evs_data)
                 st.dataframe(df_evs[['Nome do Evento', 'Data', 'Tipo']], hide_index=True, use_container_width=True)
-                
                 st.divider()
-                st.subheader("🗑️ Remover Evento")
-                ev_to_rem = st.selectbox("Selecione o evento para apagar:", df_evs['Nome do Evento'].tolist())
-                if st.button("Confirmar Eliminação de Evento", type="primary"):
+                ev_to_rem = st.selectbox("Selecione para apagar:", df_evs['Nome do Evento'].tolist())
+                if st.button("Confirmar Eliminação", type="primary"):
                     ev_id = df_evs[df_evs['Nome do Evento'] == ev_to_rem].iloc[0]['_id']
                     base.delete_row("Eventos", ev_id)
                     st.rerun()
-            else: st.info("Sem eventos registados.")
 
         with t2:
-            st.subheader("Escola Geral (Todos os Alunos)")
+            st.subheader("Escola Geral")
             aulas_data = base.list_rows("Aulas")
             if aulas_data:
                 df_aulas = pd.DataFrame(aulas_data)
                 st.dataframe(df_aulas[['Professor', 'Aluno', 'Contacto', 'DiaHora', 'Sala']], hide_index=True, use_container_width=True)
+
+        with t3:
+            mostrar_galeria(base.list_rows("Eventos"))
 
     # --- 2. PROFESSOR ---
     elif role == "Professor":
@@ -127,17 +139,4 @@ else:
             df_p = pd.DataFrame(aulas_all)
             meus = df_p[df_p['Professor'].str.lower().str.strip() == username_clean].copy()
             if not meus.empty:
-                st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], hide_index=True, use_container_width=True)
-                st.divider()
-                rem = st.selectbox("Remover aluno:", meus['Aluno'].tolist())
-                if st.button("Eliminar Aluno", type="primary"):
-                    base.delete_row("Aulas", meus[meus['Aluno'] == rem].iloc[0]['_id'])
-                    st.rerun()
-
-    # --- 3. MÚSICO ---
-    elif role == "Musico":
-        st.title("🎺 Área Músico")
-        evs_m = base.list_rows("Eventos")
-        if evs_m:
-            df_m = pd.DataFrame(evs_m)
-            st.dataframe(df_m[['Data', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
+                st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], hide_index
