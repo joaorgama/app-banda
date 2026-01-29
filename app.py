@@ -23,7 +23,7 @@ if 'username' not in st.session_state:
 
 # --- LOGIN (Com suporte a tecla ENTER) ---
 if not st.session_state['logged_in']:
-    st.header("🎵 Portal da Banda")
+    st.header("🎵 Banda Municipal de Oeiras")
     with st.form("login_form"):
         u_input = st.text_input("Utilizador").strip().lower()
         p_input = st.text_input("Password", type="password").strip()
