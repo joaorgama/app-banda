@@ -6,7 +6,6 @@ from seatable_api import Base
 SERVER_URL = "https://cloud.seatable.io"
 API_TOKEN = st.secrets["SEATABLE_TOKEN"]
 
-# Função para conectar ao SeaTable SEM cache para garantir dados frescos
 def get_base():
     base = Base(API_TOKEN, SERVER_URL)
     base.auth()
@@ -14,34 +13,79 @@ def get_base():
 
 st.set_page_config(page_title="App Banda", page_icon="🎵")
 
-# --- BOTÃO DE REFRESH NA BARRA LATERAL ---
-if st.sidebar.button("🔄 Atualizar Dados"):
-    st.rerun()
+# --- LOGIN STATE ---
+if 'user_role' not in st.session_state:
+    st.session_state['user_role'] = None
+if 'username' not in st.session_state:
+    st.session_state['username'] = None
 
-st.title("🎵 Gestão da Banda")
+# --- SIDEBAR ---
+if st.session_state['user_role'] is not None:
+    st.sidebar.write(f"Logado como: **{st.session_state['username']}**")
+    if st.sidebar.button("🔄 Atualizar Dados"):
+        st.rerun()
+    if st.sidebar.button("Sair"):
+        st.session_state['user_role'] = None
+        st.session_state['username'] = None
+        st.rerun()
 
-# ... (Mantenha a parte do Login igual até chegar à área dos Professores) ...
-
-# --- MENU PROFESSORES (Versão otimizada) ---
-elif role == "Professor":
-    st.subheader(f"🏫 Aulas do Prof. {user}")
+# --- LÓGICA DE LOGIN ---
+if st.session_state['user_role'] is None:
+    st.header("🎵 Login da Banda")
+    username_input = st.text_input("Utilizador")
+    password_input = st.text_input("Password", type="password")
     
-    with st.spinner('A carregar horários...'):
-        base = get_base()
-        rows = base.list_rows("Aulas")
-        df = pd.DataFrame(rows)
-    
-    if not df.empty and 'Professor' in df.columns:
-        # Filtro rigoroso: remove espaços em branco para evitar erros de digitação
-        df['Professor'] = df['Professor'].str.strip()
-        meus_alunos = df[df['Professor'] == user.strip()]
+    if st.button("Entrar"):
+        try:
+            base = get_base()
+            users = base.list_rows("Utilizadores")
+            df_users = pd.DataFrame(users)
+            
+            user_found = df_users[
+                (df_users['Username'] == username_input) & 
+                (df_users['Password'] == str(password_input))
+            ]
+            
+            if not user_found.empty:
+                st.session_state['user_role'] = user_found.iloc[0]['Funcao']
+                st.session_state['username'] = user_found.iloc[0]['Username']
+                st.rerun()
+            else:
+                st.error("Utilizador ou Password errados.")
+        except Exception as e:
+            st.error(f"Erro de ligação: {e}")
+
+# --- ÁREA RESTRITA ---
+else:
+    role = st.session_state['user_role']
+    user = st.session_state['username']
+    base = get_base()
+
+    if role == "Direcao":
+        st.title("Painel Direção")
+        rows = base.list_rows("Eventos")
+        st.write("Lista de Eventos:")
+        st.dataframe(pd.DataFrame(rows))
+
+    elif role == "Professor":
+        st.title("Área do Professor")
+        st.subheader(f"Horário de: {user}")
         
-        if not meus_alunos.empty:
-            # Seleciona apenas as colunas que existem para evitar erro
-            colunas_visiveis = [c for c in ['DiaHora', 'Aluno', 'Sala'] if c in meus_alunos.columns]
-            st.table(meus_alunos[colunas_visiveis])
+        rows = base.list_rows("Aulas")
+        if rows:
+            df = pd.DataFrame(rows)
+            # Filtro para mostrar apenas as aulas deste professor
+            meus_alunos = df[df['Professor'] == user]
+            if not meus_alunos.empty:
+                st.table(meus_alunos)
+            else:
+                st.info("Nenhuma aula encontrada para o seu utilizador.")
         else:
-            st.warning(f"Não foram encontradas aulas para o utilizador: {user}")
-            st.info("Verifique se o nome na coluna 'Professor' da tabela 'Aulas' é exatamente igual ao seu Username.")
-    else:
-        st.error("A tabela 'Aulas' não foi encontrada ou não tem a coluna 'Professor'.")
+            st.warning("Tabela de aulas vazia.")
+
+    elif role == "Musico":
+        st.title("Agenda de Músico")
+        rows = base.list_rows("Eventos")
+        if rows:
+            st.write("Próximos compromissos:")
+            st.table(pd.DataFrame(rows))
