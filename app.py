@@ -40,7 +40,7 @@ def validar_link(url):
     if not re.match(r'^https?://', url):
         return False, "❌ O link deve começar por http:// ou https://"
     if "drive.google.com" in url and "usp=sharing" not in url and "/view" not in url:
-        return True, "⚠️ Atenção: Este link do Drive pode não estar configurado para 'Qualquer pessoa com o link'."
+        return True, "⚠️ Atenção: Este link do Drive pode não estar configurado corretamente para partilha pública."
     return True, ""
 
 st.set_page_config(page_title="BMO Portal", page_icon="🎵", layout="wide")
@@ -89,10 +89,10 @@ elif st.session_state['auth_status']:
     if user['role'] == "Maestro":
         with st.sidebar.expander("📖 Guia de Links (Drive)"):
             st.caption("Como partilhar:")
-            st.write("1. No Drive, clique com o botão direito no ficheiro.")
+            st.write("1. No Drive, clique com o botão direito.")
             st.write("2. Escolha **Partilhar**.")
             st.write("3. Mude para **'Qualquer pessoa com o link'**.")
-            st.write("4. Copie o link e cole no Repertório.")
+            st.write("4. Copie e cole no portal.")
 
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
@@ -141,24 +141,41 @@ elif st.session_state['auth_status']:
     elif user['role'] == "Direcao":
         t1, t2, t3, t4 = st.tabs(["📅 Eventos", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
         with t1:
+            # Criar Evento
             with st.expander("➕ Novo Evento"):
                 with st.form("ne"):
-                    col_e1, col_e2 = st.columns(2)
-                    n = col_e1.text_input("Nome do Evento")
-                    d = col_e2.date_input("Data")
-                    h = col_e1.text_input("Hora (ex: 21:00)")
-                    t = col_e2.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada", "Outro"])
+                    ce1, ce2 = st.columns(2)
+                    n, d = ce1.text_input("Nome"), ce2.date_input("Data")
+                    h, t = ce1.text_input("Hora"), ce2.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada", "Outro"])
                     c = st.text_input("URL Cartaz")
-                    if st.form_submit_button("Criar Evento"):
+                    if st.form_submit_button("Criar"):
                         base.append_row("Eventos", {"Nome do Evento": n, "Data": str(d), "Hora": h, "Tipo": t, "Cartaz": c}); st.rerun()
-            evs = pd.DataFrame(base.list_rows("Eventos"))
-            if not evs.empty:
-                evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
-                st.dataframe(evs[['Data_FT', 'Hora', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
-                with st.expander("🗑️ Apagar"):
-                    for i, r in evs.iterrows():
-                        c1, c2 = st.columns([5,1]); c1.write(f"{r['Data_FT']} {r.get('Hora','')} - {r['Nome do Evento']}")
-                        if c2.button("Apagar", key=f"dev_{i}"): base.delete_row("Eventos", r['_id']); st.rerun()
+            
+            # Listar, Editar e Apagar Eventos
+            evs_list = base.list_rows("Eventos")
+            if evs_list:
+                df_evs = pd.DataFrame(evs_list)
+                df_evs['Data_FT'] = df_evs['Data'].apply(formatar_data_pt)
+                st.dataframe(df_evs[['Data_FT', 'Hora', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
+                
+                st.subheader("⚙️ Gestão de Eventos")
+                for i, r in df_evs.iterrows():
+                    with st.expander(f"📝 {r['Data_FT']} - {r['Nome do Evento']}"):
+                        with st.form(f"edit_ev_{i}"):
+                            col_ed1, col_ed2 = st.columns(2)
+                            ed_n = col_ed1.text_input("Nome", value=r.get('Nome do Evento', ''))
+                            ed_d = col_ed2.date_input("Data", value=converter_data_robusta(r.get('Data')))
+                            ed_h = col_ed1.text_input("Hora", value=r.get('Hora', ''))
+                            ed_t = col_ed2.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada", "Outro"], index=["Ensaio", "Concerto", "Arruada", "Outro"].index(r.get('Tipo', 'Ensaio')))
+                            ed_c = st.text_input("URL Cartaz", value=r.get('Cartaz', ''))
+                            
+                            c_save, c_del = st.columns([1,1])
+                            if c_save.form_submit_button("💾 Guardar Alterações"):
+                                base.update_row("Eventos", r['_id'], {"Nome do Evento": ed_n, "Data": str(ed_d), "Hora": ed_h, "Tipo": ed_t, "Cartaz": ed_c})
+                                st.success("Atualizado!"); time.sleep(0.5); st.rerun()
+                            if c_del.form_submit_button("🗑️ Apagar Evento"):
+                                base.delete_row("Eventos", r['_id']); st.rerun()
+
         with t2:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
             if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
