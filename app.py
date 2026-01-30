@@ -23,65 +23,74 @@ def hash_password(password):
     return hashlib.sha256(str(password).encode()).hexdigest()
 
 def gerar_username(nome_completo):
-    """Gera username no formato primeiro_ultimo (ex: joao_gama)"""
     partes = str(nome_completo).strip().split()
     if len(partes) >= 2:
         return f"{partes[0].lower()}_{partes[-1].lower()}"
     return partes[0].lower()
+
+def sincronizar_utilizadores(base):
+    """Cria utilizadores na tabela Utilizadores se existirem novos Músicos"""
+    try:
+        df_utilizadores = pd.DataFrame(base.list_rows("Utilizadores"))
+        df_musicos = pd.DataFrame(base.list_rows("Musicos"))
+        
+        usernames_existentes = df_utilizadores['Username'].str.lower().tolist() if not df_utilizadores.empty else []
+        
+        for _, musico in df_musicos.iterrows():
+            novo_user = gerar_username(musico['Nome'])
+            if novo_user not in usernames_existentes:
+                # Criar novo utilizador automaticamente
+                base.append_row("Utilizadores", {
+                    "Username": novo_user,
+                    "Password": DEFAULT_PASS,
+                    "Funcao": "Musico",
+                    "Nome": musico['Nome'] # Guarda o nome real para referência
+                })
+        return True
+    except Exception as e:
+        st.error(f"Erro na sincronização: {e}")
+        return False
 
 st.set_page_config(page_title="Banda Municipal de Oeiras", page_icon="🎵", layout="wide")
 
 if 'auth_status' not in st.session_state: st.session_state['auth_status'] = False
 if 'user_info' not in st.session_state: st.session_state['user_info'] = {}
 
-# --- LOGIN ---
-if not st.session_state['auth_status']:
+# --- PROCESSO DE LOGIN ---
+base = get_base()
+
+if base and not st.session_state['auth_status']:
+    # Sincroniza sempre antes do login para garantir que novos músicos podem entrar
+    sincronizar_utilizadores(base)
+    
     st.header("🎵 Portal da Banda")
     with st.form("login_form"):
         u_input = st.text_input("Utilizador (ex: joao_gama)").strip().lower()
         p_input = st.text_input("Password", type="password").strip()
+        
         if st.form_submit_button("Entrar"):
-            base = get_base()
-            if base:
-                # Busca em Utilizadores (Direção/Professor)
-                df_u = pd.DataFrame(base.list_rows("Utilizadores"))
-                match_u = df_u[df_u['Username'].str.lower().str.strip() == u_input] if not df_u.empty else pd.DataFrame()
-                
-                # Busca em Musicos (Login Automático)
-                df_m = pd.DataFrame(base.list_rows("Musicos"))
-                if not df_m.empty:
-                    df_m['gen_user'] = df_m['Nome'].apply(gerar_username)
-                    match_m = df_m[df_m['gen_user'] == u_input]
-                else: match_m = pd.DataFrame()
+            df_u = pd.DataFrame(base.list_rows("Utilizadores"))
+            match = df_u[df_u['Username'].str.lower() == u_input]
 
-                if not match_u.empty:
-                    row = match_u.iloc[0]
-                    role = row['Funcao']
-                    display_name = row['Username']
-                    target_table = "Utilizadores"
-                elif not match_m.empty:
-                    row = match_m.iloc[0]
-                    role = "Musico"
-                    display_name = row['Nome']
-                    target_table = "Musicos"
-                else:
-                    st.error("Utilizador não encontrado.")
-                    st.stop()
-
-                # Verificação de Password (Default: 1234)
+            if not match.empty:
+                row = match.iloc[0]
                 stored_p = str(row.get('Password', DEFAULT_PASS))
-                if (p_input == DEFAULT_PASS and (stored_p == DEFAULT_PASS or stored_p == 'nan')) or hash_password(p_input) == stored_p:
+                
+                # Valida password (seja texto limpo '1234' ou hash)
+                if (p_input == DEFAULT_PASS and stored_p == DEFAULT_PASS) or hash_password(p_input) == stored_p:
                     st.session_state['auth_status'] = True
                     st.session_state['user_info'] = {
-                        'username': u_input, 'display_name': display_name,
-                        'role': role, 'row_id': row['_id'], 'table': target_table
+                        'username': u_input,
+                        'display_name': row.get('Nome', u_input),
+                        'role': row['Funcao'],
+                        'row_id': row['_id']
                     }
                     st.rerun()
                 else: st.error("Password incorreta.")
-            else: st.error("Erro de ligação ao SeaTable.")
+            else: st.error("Utilizador não encontrado. Verifique se o nome está correto na tabela Musicos.")
 
-else:
-    base = get_base()
+# --- ÁREA LOGADA ---
+elif st.session_state['auth_status']:
     user = st.session_state['user_info']
     
     st.sidebar.title("Menu")
@@ -90,43 +99,40 @@ else:
         st.session_state.clear()
         st.rerun()
 
-    # --- ÁREA MÚSICO ---
+    # MÚSICO
     if user['role'] == "Musico":
         st.title("🎺 Área do Músico")
         t1, t2 = st.tabs(["📅 Agenda", "👤 Os Meus Dados"])
         
         with t1:
             evs = base.list_rows("Eventos")
-            if evs:
-                st.dataframe(pd.DataFrame(evs)[['Data', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
+            if evs: st.dataframe(pd.DataFrame(evs)[['Data', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
         
         with t2:
-            st.subheader("Consulta e Edição de Perfil")
-            m_data = base.get_row("Musicos", user['row_id'])
+            # Para editar dados, precisamos de encontrar a linha dele na tabela Musicos
+            df_m = pd.DataFrame(base.list_rows("Musicos"))
+            df_m['gen_user'] = df_m['Nome'].apply(gerar_username)
+            musico_match = df_m[df_m['gen_user'] == user['username']]
             
-            with st.form("edit_me"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    novo_tel = st.text_input("Telefone", value=str(m_data.get('Telefone', '')))
-                    novo_email = st.text_input("Email", value=str(m_data.get('Email', '')))
-                with col2:
-                    st.info(f"Nascimento: {m_data.get('Data de Nascimento', '')}")
-                    st.info(f"Ingresso: {m_data.get('Data Ingresso Banda', '')}")
-                
-                nova_morada = st.text_area("Morada", value=str(m_data.get('Morada', '')))
-                
-                if st.form_submit_button("Guardar Alterações"):
-                    base.update_row("Musicos", user['row_id'], {
-                        "Telefone": novo_tel,
-                        "Email": novo_email,
-                        "Morada": nova_morada
-                    })
-                    st.success("Dados atualizados!")
-                    time.sleep(1)
-                    st.rerun()
+            if not musico_match.empty:
+                m_row = musico_match.iloc[0]
+                with st.form("edit_perfil"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        n_tel = st.text_input("Telefone", value=str(m_row.get('Telefone', '')))
+                        n_mail = st.text_input("Email", value=str(m_row.get('Email', '')))
+                    with col2:
+                        st.info(f"Nascimento: {m_row.get('Data de Nascimento', '---')}")
+                        st.info(f"Ingresso: {m_row.get('Data Ingresso Banda', '---')}")
+                    
+                    n_morada = st.text_area("Morada", value=str(m_row.get('Morada', '')))
+                    
+                    if st.form_submit_button("Guardar Alterações"):
+                        base.update_row("Musicos", m_row['_id'], {"Telefone": n_tel, "Email": n_mail, "Morada": n_morada})
+                        st.success("Dados atualizados na ficha de músico!")
+            else: st.warning("Não foi possível localizar a sua ficha na tabela Musicos para edição.")
 
-    # --- ÁREA PROFESSOR / DIREÇÃO ---
-    elif user['role'] in ["Professor", "Direcao"]:
-        # (Aqui continua o código anterior de gestão de eventos e alunos)
+    # DIREÇÃO / PROFESSOR
+    elif user['role'] in ["Direcao", "Professor"]:
         st.title(f"🛡️ Painel {user['role']}")
-        st.write("Funcionalidades de gestão ativas.")
+        # ... resto do código de gestão ...
