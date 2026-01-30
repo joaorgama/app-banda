@@ -92,7 +92,11 @@ elif st.session_state['auth_status']:
 
     # --- PERFIL MÚSICO ---
     if user['role'] == "Musico":
-        t1, t2, t3, t4 = st.tabs(["📅 Agenda & Presenças", "👤 Meus Dados", "🎼 Repertório", "🖼️ Galeria"])
+        t1, t2, t3, t4, t5 = st.tabs(["📅 Agenda & Presenças", "👤 Meus Dados", "🎷 Meu Instrumento", "🎼 Repertório", "🖼️ Galeria"])
+        
+        musicos = base.list_rows("Musicos")
+        m_row = next((r for r in musicos if str(r.get('Username','')).lower() == user['username']), None)
+        
         with t1:
             st.subheader("Confirmar Disponibilidade")
             evs = base.list_rows("Eventos")
@@ -111,9 +115,8 @@ elif st.session_state['auth_status']:
                     if c3.button("❓ Talvez", key=f"t_{e['_id']}"):
                         base.query(f"DELETE FROM Presencas WHERE EventoID = '{e['_id']}' AND Username = '{user['username']}'")
                         base.append_row("Presencas", {"EventoID": e['_id'], "Username": user['username'], "Resposta": "Talvez"}); st.rerun()
+        
         with t2:
-            musicos = base.list_rows("Musicos")
-            m_row = next((r for r in musicos if str(r.get('Username','')).lower() == user['username']), None)
             if m_row:
                 with st.form("ficha"):
                     c1, c2 = st.columns(2)
@@ -121,9 +124,30 @@ elif st.session_state['auth_status']:
                     n_mail = c1.text_input("Email", value=str(m_row.get('Email', '')))
                     n_nasc = c1.date_input("Nascimento", value=converter_data_robusta(m_row.get('Data de Nascimento')) or datetime(1990,1,1))
                     n_morada = c2.text_area("Morada", value=str(m_row.get('Morada', '')))
-                    if st.form_submit_button("💾 Guardar"):
+                    if st.form_submit_button("💾 Guardar Dados"):
                         base.update_row("Musicos", m_row['_id'], {"Telefone": n_tel, "Email": n_mail, "Morada": n_morada, "Data de Nascimento": str(n_nasc)}); st.success("Guardado!"); st.rerun()
+        
         with t3:
+            st.subheader("Dados do Instrumento")
+            if m_row:
+                with st.form("inst_form"):
+                    proprio = st.checkbox("Instrumento Próprio", value=m_row.get('Instrumento Proprio', False))
+                    inst_nome = st.text_input("Instrumento", value=m_row.get('Instrumento', ''), help="Ex: Trompete, Clarinete...")
+                    
+                    # Campos desativados se for instrumento próprio
+                    marca = st.text_input("Marca", value=m_row.get('Marca', ''), disabled=proprio)
+                    modelo = st.text_input("Modelo", value=m_row.get('Modelo', ''), disabled=proprio)
+                    n_serie = st.text_input("Número de Série", value=m_row.get('Num Serie', ''), disabled=proprio, help="Número único gravado no instrumento")
+                    
+                    if st.form_submit_button("💾 Atualizar Instrumento"):
+                        update_data = {"Instrumento Proprio": proprio, "Instrumento": inst_nome}
+                        if not proprio:
+                            update_data.update({"Marca": marca, "Modelo": modelo, "Num Serie": n_serie})
+                        else:
+                            update_data.update({"Marca": "", "Modelo": "", "Num Serie": ""})
+                        base.update_row("Musicos", m_row['_id'], update_data)
+                        st.success("Instrumento atualizado!"); st.rerun()
+        with t4:
             rep = base.list_rows("Repertorio")
             if rep:
                 for r in rep:
@@ -131,31 +155,30 @@ elif st.session_state['auth_status']:
                         st.write(f"**Compositor:** {r.get('Compositor', '---')}")
                         l = r.get('Links', '')
                         if l: st.video(l) if "youtube" in l else st.link_button("Abrir Link", l)
-        with t4:
+        with t5:
             arts = [e for e in base.list_rows("Eventos") if e.get('Cartaz') and str(e['Cartaz']).strip().startswith('http')]
             if arts:
                 cols = st.columns(3)
                 for i, ev in enumerate(arts): cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento'])
-            else: st.info("Nenhum cartaz disponível na galeria.")
 
     # --- PAINEL DIREÇÃO ---
     elif user['role'] == "Direcao":
-        t1, t2, t3, t4 = st.tabs(["📅 Eventos & Presenças", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
+        t1, t2, t3, t4, t5 = st.tabs(["📅 Eventos & Presenças", "🎷 Inventário", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
         with t1:
             with st.expander("➕ Novo Evento"):
                 with st.form("ne"):
                     ce1, ce2 = st.columns(2)
                     n, d = ce1.text_input("Nome"), ce2.date_input("Data")
                     h, t = ce1.text_input("Hora"), ce2.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada", "Outro"])
-                    c = st.text_input("URL Cartaz (Link da imagem)")
+                    c = st.text_input("URL Cartaz")
                     if st.form_submit_button("Criar"):
                         base.append_row("Eventos", {"Nome do Evento": n, "Data": str(d), "Hora": h, "Tipo": t, "Cartaz": c}); st.rerun()
             
             evs = base.list_rows("Eventos")
             pres_all = base.list_rows("Presencas")
             for e in evs:
-                with st.expander(f"📝 {formatar_data_pt(e['Data'])} - {e['Nome do Evento']} (Editar/Presenças)"):
-                    tabs_ev = st.tabs(["✏️ Editar Dados", "👥 Ver Presenças"])
+                with st.expander(f"📝 {formatar_data_pt(e['Data'])} - {e['Nome do Evento']}"):
+                    tabs_ev = st.tabs(["✏️ Editar", "👥 Presenças"])
                     with tabs_ev[0]:
                         with st.form(f"ed_{e['_id']}"):
                             ed_n = st.text_input("Nome", value=e.get('Nome do Evento'))
@@ -169,19 +192,29 @@ elif st.session_state['auth_status']:
                     with tabs_ev[1]:
                         p_ev = [p for p in pres_all if p['EventoID'] == e['_id']]
                         if p_ev:
-                            df_p = pd.DataFrame(p_ev)
-                            st.write(f"**Total Confirmado:** {len(df_p[df_p['Resposta']=='Vou'])}")
-                            st.dataframe(df_p[['Username', 'Resposta']], use_container_width=True, hide_index=True)
-                        else: st.write("Ainda sem respostas.")
+                            st.dataframe(pd.DataFrame(p_ev)[['Username', 'Resposta']], use_container_width=True, hide_index=True)
+                        else: st.write("Sem respostas.")
+
         with t2:
+            st.subheader("Lista de Instrumentos dos Músicos")
+            mus_list = base.list_rows("Musicos")
+            if mus_list:
+                df_inst = pd.DataFrame(mus_list)
+                # Seleção de colunas incluindo o Novo Número de Série
+                cols_show = ['Nome', 'Instrumento', 'Instrumento Proprio', 'Marca', 'Modelo', 'Num Serie']
+                # Garantir que as colunas existem no dataframe para evitar erros
+                df_final = df_inst[[c for c in cols_show if c in df_inst.columns]]
+                st.dataframe(df_final, use_container_width=True, hide_index=True)
+
+        with t3:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
             if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
-        with t3:
+        with t4:
             arts = [e for e in base.list_rows("Eventos") if e.get('Cartaz') and str(e['Cartaz']).strip().startswith('http')]
             if arts:
                 cols = st.columns(3)
                 for i, ev in enumerate(arts): cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento'])
-        with t4:
+        with t5:
             mus_raw = base.list_rows("Musicos")
             if mus_raw:
                 st_list = [{"Nome": m.get('Nome'), "Estado": "✅ OK" if not [f for f in ["Username", "Telefone", "Email", "Morada", "Data de Nascimento"] if not m.get(f)] else "❌ Incompleto"} for m in mus_raw]
