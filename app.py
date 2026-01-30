@@ -4,6 +4,7 @@ from seatable_api import Base
 import hashlib
 import time
 from datetime import datetime
+import re
 
 # --- CONFIGURAÇÃO ---
 SERVER_URL = "https://cloud.seatable.io"
@@ -34,6 +35,15 @@ def formatar_data_pt(valor):
     dt = converter_data_robusta(valor)
     return dt.strftime('%d/%m/%Y') if dt else "---"
 
+def validar_link(url):
+    """Valida se o link é uma URL e se tem formato de partilha do Drive"""
+    if not url: return True, ""
+    if not re.match(r'^https?://', url):
+        return False, "❌ O link deve começar por http:// ou https://"
+    if "drive.google.com" in url and "usp=sharing" not in url and "/view" not in url:
+        return True, "⚠️ Atenção: Este link do Drive pode não estar configurado para 'Qualquer pessoa com o link'."
+    return True, ""
+
 st.set_page_config(page_title="BMO Portal", page_icon="🎵", layout="wide")
 
 if 'auth_status' not in st.session_state: 
@@ -61,7 +71,7 @@ if base and not st.session_state['auth_status']:
             else: st.error("Utilizador não encontrado.")
 
 elif st.session_state.get('must_change_pass'):
-    st.warning("⚠️ Altere a sua password de primeiro acesso (1234).")
+    st.warning("⚠️ Segurança: Altere a sua password de primeiro acesso (1234).")
     with st.form("f_change"):
         n1, n2 = st.text_input("Nova Password", type="password"), st.text_input("Confirmar", type="password")
         if st.form_submit_button("Atualizar"):
@@ -76,6 +86,16 @@ elif st.session_state['auth_status']:
     user = st.session_state['user_info']
     st.sidebar.title("🎵 BMO")
     st.sidebar.write(f"Olá, **{user['display_name']}**")
+    
+    # --- GUIA DO MAESTRO NA SIDEBAR ---
+    if user['role'] == "Maestro":
+        with st.sidebar.expander("📖 Guia de Links (Drive)"):
+            st.caption("Como partilhar:")
+            st.write("1. No Google Drive, clique com o botão direito no ficheiro.")
+            st.write("2. Escolha **Partilhar**.")
+            st.write("3. Mude para **'Qualquer pessoa com o link'**.")
+            st.write("4. Copie o link e cole no Repertório.")
+
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
     # --- PERFIL MÚSICO ---
@@ -111,7 +131,7 @@ elif st.session_state['auth_status']:
                     with st.expander(f"🎵 {r.get('Nome da Obra', 'S/ Nome')}"):
                         st.write(f"**Compositor:** {r.get('Compositor', '---')}")
                         l = r.get('Links', '')
-                        if l: st.video(l) if "youtube.com" in l or "youtu.be" in l else st.link_button("Abrir Link", l)
+                        if l: st.video(l) if "youtube.com" in l or "youtu.be" in l else st.link_button("Abrir Link / Partitura", l)
         with t4:
             evs_gal = base.list_rows("Eventos")
             arts = [e for e in evs_gal if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
@@ -131,7 +151,7 @@ elif st.session_state['auth_status']:
             if not evs.empty:
                 evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
                 st.dataframe(evs[['Data_FT', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
-                with st.expander("🗑️ Apagar Evento"):
+                with st.expander("🗑️ Apagar"):
                     for i, r in evs.iterrows():
                         c1, c2 = st.columns([5,1]); c1.write(f"{r['Nome do Evento']}"); 
                         if c2.button("Apagar", key=f"dev_{i}"): base.delete_row("Eventos", r['_id']); st.rerun()
@@ -161,11 +181,19 @@ elif st.session_state['auth_status']:
         t1, t2, t3 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral"])
         with t1:
             st.subheader("Gerir Repertório")
-            with st.expander("➕ Adicionar Obra"):
+            with st.expander("➕ Adicionar Obra em Trabalho"):
                 with st.form("add_rep"):
-                    n, c, l = st.text_input("Nome da Obra"), st.text_input("Compositor"), st.text_input("Link (Drive/Youtube)")
-                    if st.form_submit_button("Publicar"):
-                        base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l}); st.rerun()
+                    n, c = st.text_input("Nome da Obra"), st.text_input("Compositor")
+                    l = st.text_input("Link (Drive/Youtube)")
+                    
+                    ok, msg = validar_link(l)
+                    if not ok: st.error(msg)
+                    elif msg: st.warning(msg)
+                    
+                    if st.form_submit_button("Publicar para Músicos") and ok:
+                        base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l})
+                        st.success("Repertório publicado!"); time.sleep(1); st.rerun()
+            
             rep = base.list_rows("Repertorio")
             if rep:
                 for idx, r in enumerate(rep):
@@ -182,7 +210,7 @@ elif st.session_state['auth_status']:
 
     # --- PAINEL PROFESSOR ---
     elif user['role'] == "Professor":
-        st.title("👨‍🏫 Gestão de Alunos")
+        st.title("👨‍🏫 Alunos")
         with st.expander("➕ Novo Aluno"):
             with st.form("add_al"):
                 n, c, h, s = st.text_input("Nome"), st.text_input("Contacto"), st.text_input("Horário"), st.text_input("Sala")
