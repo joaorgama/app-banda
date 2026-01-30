@@ -4,6 +4,7 @@ from seatable_api import Base
 import hashlib
 import time
 import unicodedata
+from datetime import datetime
 
 # --- CONFIGURAÇÃO ---
 SERVER_URL = "https://cloud.seatable.io"
@@ -32,9 +33,8 @@ def gerar_username(nome_completo):
     return remover_acentos(u)
 
 def formatar_data_pt(data_str):
-    """Converte YYYY-MM-DD para DD/MM/YYYY com segurança"""
     try:
-        if not data_str or str(data_str) == 'None': return "---"
+        if not data_str or str(data_str) == 'None' or str(data_str) == 'nan': return "---"
         return pd.to_datetime(data_str).strftime('%d/%m/%Y')
     except: return str(data_str)
 
@@ -42,23 +42,16 @@ def sincronizar_e_limpar(base):
     try:
         rows_u = base.list_rows("Utilizadores")
         df_m = pd.DataFrame(base.list_rows("Musicos"))
-        
-        # Remove users com acentos/cedilhas
         for r in rows_u:
             u_orig = r.get('Username', '')
             if u_orig != remover_acentos(u_orig):
                 base.delete_row("Utilizadores", r['_id'])
-        
         df_u_atual = pd.DataFrame(base.list_rows("Utilizadores"))
         existentes = df_u_atual['Username'].tolist() if not df_u_atual.empty else []
-        
         for _, m in df_m.iterrows():
             novo_u = gerar_username(m['Nome'])
             if novo_u not in existentes:
-                base.append_row("Utilizadores", {
-                    "Username": novo_u, "Password": DEFAULT_PASS,
-                    "Funcao": "Musico", "Nome": m['Nome']
-                })
+                base.append_row("Utilizadores", {"Username": novo_u, "Password": DEFAULT_PASS, "Funcao": "Musico", "Nome": m['Nome']})
     except: pass
 
 st.set_page_config(page_title="Banda Municipal de Oeiras", page_icon="🎵", layout="wide")
@@ -67,6 +60,18 @@ if 'auth_status' not in st.session_state:
     st.session_state.update({'auth_status': False, 'user_info': {}, 'must_change_pass': False})
 
 base = get_base()
+
+# --- FUNÇÃO GALERIA (URL) ---
+def mostrar_galeria(lista_eventos):
+    st.subheader("🖼️ Galeria de Cartazes")
+    cartazes = [ev for ev in lista_eventos if ev.get('Cartaz') and str(ev['Cartaz']).startswith('http')]
+    if cartazes:
+        cols = st.columns(2)
+        for idx, ev in enumerate(cartazes):
+            with cols[idx % 2]:
+                st.image(ev['Cartaz'], caption=f"{ev.get('Nome do Evento')}", use_container_width=True)
+    else:
+        st.info("Ainda não existem cartazes disponíveis.")
 
 # --- LOGIN ---
 if base and not st.session_state['auth_status']:
@@ -94,7 +99,6 @@ if base and not st.session_state['auth_status']:
 elif st.session_state['auth_status']:
     user = st.session_state['user_info']
     
-    # MUDANÇA DE PASSWORD OBRIGATÓRIA
     if st.session_state['must_change_pass']:
         st.warning("⚠️ Segurança: Altere a sua password para o primeiro acesso.")
         with st.form("change"):
@@ -109,49 +113,59 @@ elif st.session_state['auth_status']:
                 else: st.error("Erro: Passwords diferentes ou muito curtas.")
         st.stop()
 
-    st.sidebar.button("Sair", on_click=lambda: st.session_state.clear())
+    # BARRA LATERAL (RECUPERADA)
+    st.sidebar.title("🎵 BMO")
+    st.sidebar.write(f"Músico: **{user['display_name']}**")
+    st.sidebar.write(f"Utilizador: `{user['username']}`")
+    if st.sidebar.button("🚪 Sair"):
+        st.session_state.clear(); st.rerun()
 
     # --- PERFIL MÚSICO ---
     if user['role'] == "Musico":
         st.title("🎺 Área do Músico")
-        t1, t2 = st.tabs(["📅 Agenda", "👤 Os Meus Dados"])
+        t1, t2, t3 = st.tabs(["📅 Agenda", "👤 Os Meus Dados", "🖼️ Galeria"])
         
         with t1:
             evs = base.list_rows("Eventos")
             if evs:
                 df_evs = pd.DataFrame(evs)
-                # Formatar data na tabela de eventos
                 df_evs['Data'] = df_evs['Data'].apply(formatar_data_pt)
                 st.dataframe(df_evs[['Data', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
         
         with t2:
             musicos = base.list_rows("Musicos")
             m_row = next((r for r in musicos if r.get('Nome') == user['display_name']), None)
-            
             if m_row:
-                st.subheader("Ficha de Dados Pessoais")
                 with st.form("perfil"):
                     tel_limpo = str(m_row.get('Telefone', '')).split('.')[0]
                     col1, col2 = st.columns(2)
                     with col1:
                         n_tel = st.text_input("Telefone", value=tel_limpo)
                         n_mail = st.text_input("Email", value=str(m_row.get('Email', '')))
+                        # DATA DE NASCIMENTO EDITÁVEL
+                        d_nasc_val = m_row.get('Data de Nascimento')
+                        try:
+                            d_nasc_default = datetime.strptime(d_nasc_val, '%Y-%m-%d') if d_nasc_val else datetime.now()
+                        except: d_nasc_default = datetime.now()
+                        n_nasc = st.date_input("Data de Nascimento", value=d_nasc_default)
                     with col2:
-                        st.write(f"**Nascimento:** {formatar_data_pt(m_row.get('Data de Nascimento'))}")
-                        st.write(f"**Ingresso na Banda:** {formatar_data_pt(m_row.get('Data Ingresso Banda'))}")
+                        st.info(f"Ingresso na Banda: {formatar_data_pt(m_row.get('Data Ingresso Banda'))}")
+                        n_morada = st.text_area("Morada", value=str(m_row.get('Morada', '')))
                     
-                    n_morada = st.text_area("Morada", value=str(m_row.get('Morada', '')))
-                    st.text_area("Observações (Apenas Direção)", value=str(m_row.get('Obs', '')), disabled=True)
+                    st.text_area("Observações (Apenas Leitura)", value=str(m_row.get('Obs', '')), disabled=True)
                     
                     if st.form_submit_button("Gravar Alterações"):
                         base.update_row("Musicos", m_row['_id'], {
-                            "Telefone": n_tel, "Email": n_mail, "Morada": n_morada
+                            "Telefone": n_tel, "Email": n_mail, 
+                            "Morada": n_morada, "Data de Nascimento": str(n_nasc)
                         })
-                        st.success("Os seus dados foram atualizados no sistema!")
+                        st.success("Dados atualizados!")
                         time.sleep(1); st.rerun()
-            else: st.error("Ficha não encontrada na tabela Músicos.")
+        
+        with t3:
+            mostrar_galeria(base.list_rows("Eventos"))
 
     # --- PERFIL DIREÇÃO / PROFESSOR ---
     elif user['role'] in ["Direcao", "Professor"]:
         st.title(f"🛡️ Painel {user['role']}")
-        # Lógica de gestão de eventos e alunos...
+        # Mantém as funções de gerir eventos/aulas aqui
