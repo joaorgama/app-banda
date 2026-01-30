@@ -137,17 +137,31 @@ elif st.session_state['auth_status']:
             if arts:
                 cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
         with t4:
-            st.subheader("📋 Status das Fichas e Segurança")
-            mus = pd.DataFrame(base.list_rows("Musicos"))
-            uts = pd.DataFrame(base.list_rows("Utilizadores"))
-            if not mus.empty:
-                mus['Username OK'] = mus['Username'].apply(lambda x: "✅" if x else "❌")
-                st.write("**Músicos sem Username definido:**")
-                st.dataframe(mus[mus['Username OK'] == "❌"][['Nome']], use_container_width=True, hide_index=True)
-            if not uts.empty:
-                uts['Pass Segura'] = uts['Password'].apply(lambda x: "⚠️ Padrão (1234)" if x == DEFAULT_PASS else "✅ Alterada")
-                st.write("**Estado das Passwords:**")
-                st.dataframe(uts[['Nome', 'Pass Segura']], use_container_width=True, hide_index=True)
+            st.subheader("📋 Status de Dados dos Músicos")
+            mus_raw = base.list_rows("Musicos")
+            uts_raw = base.list_rows("Utilizadores")
+            if mus_raw:
+                status_data = []
+                for m in mus_raw:
+                    faltam = []
+                    if not m.get('Username'): faltam.append("Username")
+                    if not m.get('Telefone'): faltam.append("Telefone")
+                    if not m.get('Email'): faltam.append("Email")
+                    if not m.get('Morada'): faltam.append("Morada")
+                    if not m.get('Data de Nascimento'): faltam.append("Data Nasc.")
+                    
+                    status_data.append({
+                        "Nome": m.get('Nome'),
+                        "Estado": "✅ Completo" if not faltam else f"❌ Falta: {', '.join(faltam)}",
+                        "Username": m.get('Username', '---')
+                    })
+                st.dataframe(pd.DataFrame(status_data), use_container_width=True, hide_index=True)
+            
+            st.subheader("🔐 Segurança (Passwords)")
+            if uts_raw:
+                uts_df = pd.DataFrame(uts_raw)
+                uts_df['Estado Password'] = uts_df['Password'].apply(lambda x: "⚠️ 1234 (Mudar!)" if x == DEFAULT_PASS else "✅ Segura")
+                st.dataframe(uts_df[['Nome', 'Estado Password']], use_container_width=True, hide_index=True)
 
     # --- PAINEL PROFESSOR ---
     elif user['role'] == "Professor":
