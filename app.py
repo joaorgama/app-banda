@@ -22,22 +22,10 @@ def get_base():
 def hash_password(password):
     return hashlib.sha256(str(password).encode()).hexdigest()
 
-def remover_acentos(texto):
-    if not texto or pd.isna(texto): return ""
-    return unicodedata.normalize('NFKD', str(texto)).encode('ascii', 'ignore').decode('utf-8').lower().strip().replace(" ", "_")
-
-def gerar_username_simples(nome_completo):
-    """Gera username a partir do primeiro e último nome, ignorando partículas."""
-    partes = [p for p in str(nome_completo).strip().split() if len(p) > 2]
-    if len(partes) >= 2:
-        u = f"{partes[0]}_{partes[-1]}"
-    else:
-        u = partes[0] if partes else "user"
-    return remover_acentos(u)
-
 def formatar_data_pt(data_str):
     try:
         if not data_str or str(data_str) in ['None', 'nan', '']: return "---"
+        # Garante que lidamos com strings de data do SeaTable (YYYY-MM-DD)
         return pd.to_datetime(data_str).strftime('%d/%m/%Y')
     except: return str(data_str)
 
@@ -50,7 +38,7 @@ base = get_base()
 
 # --- LOGIN ---
 if base and not st.session_state['auth_status']:
-    st.header("🎵 Portal da Banda")
+    st.header("🎵 Portal da Banda Municipal de Oeiras")
     with st.form("login"):
         u_in = st.text_input("Utilizador").strip().lower()
         p_in = st.text_input("Password", type="password").strip()
@@ -74,9 +62,10 @@ if base and not st.session_state['auth_status']:
 elif st.session_state['auth_status']:
     user = st.session_state['user_info']
     
+    # Sidebar
     st.sidebar.title("🎵 BMO")
     st.sidebar.write(f"Olá, **{user['display_name']}**")
-    st.sidebar.caption(f"Acesso: {user['role']}")
+    st.sidebar.caption(f"Perfil: {user['role']}")
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
     # --- PERFIL MÚSICO ---
@@ -86,13 +75,15 @@ elif st.session_state['auth_status']:
         with t1:
             evs = pd.DataFrame(base.list_rows("Eventos"))
             if not evs.empty:
-                evs['Data'] = evs['Data'].apply(formatar_data_pt)
-                st.dataframe(evs[['Data', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
+                evs['Data_Formatada'] = evs['Data'].apply(formatar_data_pt)
+                st.dataframe(evs[['Data_Formatada', 'Nome do Evento', 'Tipo']], 
+                             column_config={"Data_Formatada": "Data"},
+                             hide_index=True, use_container_width=True)
 
         with t2:
+            # LIGAÇÃO DIRETA PELA NOVA COLUNA USERNAME
             musicos = base.list_rows("Musicos")
-            # LOGICA DE BUSCA MELHORADA: Procura o músico onde o username coincide
-            m_row = next((r for r in musicos if gerar_username_simples(r.get('Nome')) == user['username']), None)
+            m_row = next((r for r in musicos if str(r.get('Username', '')).lower() == user['username']), None)
             
             if m_row:
                 with st.form("perfil_musico"):
@@ -103,20 +94,19 @@ elif st.session_state['auth_status']:
                         n_tel = st.text_input("Telefone", value=tel_val)
                         n_mail = st.text_input("Email", value=str(m_row.get('Email', '')))
                         
-                        # Data de Nascimento - Correção para João Gama
+                        # Data de Nascimento - Carregamento Robusto
                         d_nasc_raw = m_row.get('Data de Nascimento')
-                        if d_nasc_raw:
-                            try: d_init = datetime.strptime(str(d_nasc_raw), '%Y-%m-%d')
-                            except: d_init = datetime.now()
-                        else: d_init = datetime.now()
-                        
+                        try:
+                            d_init = datetime.strptime(str(d_nasc_raw), '%Y-%m-%d') if d_nasc_raw else datetime.now()
+                        except:
+                            d_init = datetime.now()
                         n_nasc = st.date_input("Data de Nascimento", value=d_init)
                     
                     with col2:
                         st.info(f"📅 Ingresso na Banda: {formatar_data_pt(m_row.get('Data Ingresso Banda'))}")
                         n_morada = st.text_area("Morada", value=str(m_row.get('Morada', '')))
                     
-                    st.text_area("Observações (Apenas Leitura)", value=str(m_row.get('Obs', '')), disabled=True)
+                    st.text_area("Observações", value=str(m_row.get('Obs', '')), disabled=True)
                     
                     if st.form_submit_button("💾 Gravar Alterações"):
                         base.update_row("Musicos", m_row['_id'], {
@@ -124,7 +114,7 @@ elif st.session_state['auth_status']:
                         })
                         st.success("Dados atualizados!"); time.sleep(1); st.rerun()
             else:
-                st.warning("Ficha de músico não localizada para o utilizador atual.")
+                st.error(f"Erro: Não encontrámos o utilizador '{user['username']}' na coluna Username da tabela Musicos.")
 
         with t3:
             evs = base.list_rows("Eventos")
@@ -151,12 +141,9 @@ elif st.session_state['auth_status']:
                 df_evs = pd.DataFrame(evs_raw)
                 df_disp = df_evs.copy()
                 df_disp['Data'] = df_disp['Data'].apply(formatar_data_pt)
-                
                 st.subheader("Lista de Eventos")
-                # Exibição em tabela limpa
                 st.dataframe(df_disp[['Data', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
                 
-                # Área de remoção separada para evitar desformatação da tabela
                 with st.expander("🗑️ Remover Eventos"):
                     for idx, row in df_evs.iterrows():
                         c1, c2 = st.columns([5, 1])
@@ -192,8 +179,7 @@ elif st.session_state['auth_status']:
             meus = df_aulas[df_aulas['Professor'] == user['display_name']]
             st.subheader("Meus Alunos")
             st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
-            
-            with st.expander("🗑️ Gestão de Alunos (Remover)"):
+            with st.expander("🗑️ Remover Alunos"):
                 for idx, row in meus.iterrows():
                     c1, c2 = st.columns([5, 1])
                     c1.write(f"👤 **{row['Aluno']}**")
