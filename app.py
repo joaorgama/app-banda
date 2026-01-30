@@ -85,7 +85,7 @@ elif st.session_state['auth_status']:
     st.sidebar.write(f"Olá, **{user['display_name']}**")
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
-    # --- PERFIL MÚSICO (Agenda, Dados, Instrumento S/N, Repertório, Galeria) ---
+    # --- PERFIL MÚSICO (Agenda, Dados, Instrumento, Repertório, Galeria) ---
     if user['role'] == "Musico":
         t1, t2, t3, t4, t5 = st.tabs(["📅 Agenda & Presenças", "👤 Meus Dados", "🎷 Meu Instrumento", "🎼 Repertório", "🖼️ Galeria"])
         musicos = base.list_rows("Musicos")
@@ -138,7 +138,7 @@ elif st.session_state['auth_status']:
             arts = [e for e in base.list_rows("Eventos") if e.get('Cartaz') and str(e['Cartaz']).strip().startswith('http')]
             cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
 
-    # --- PAINEL DIREÇÃO (Eventos, Inventário, Escola, Galeria) ---
+    # --- PAINEL DIREÇÃO ---
     elif user['role'] == "Direcao":
         t1, t2, t3, t4, t5 = st.tabs(["📅 Eventos & Presenças", "🎷 Inventário", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
         with t1:
@@ -175,10 +175,10 @@ elif st.session_state['auth_status']:
             st_list = [{"Nome": m.get('Nome'), "Estado": "✅ OK" if not [f for f in ["Username", "Telefone", "Email", "Morada", "Data de Nascimento"] if not m.get(f)] else "❌ Incompleto"} for m in mus_raw]
             st.dataframe(pd.DataFrame(st_list), use_container_width=True, hide_index=True)
 
-    # --- PAINEL PROFESSOR (CALENDÁRIO DINÂMICO 2 SEMANAS) ---
+    # --- PAINEL PROFESSOR (CALENDÁRIO COM DESTAQUE ⭐ E RECORRÊNCIA) ---
     elif user['role'] == "Professor":
         st.header("👨‍🏫 Portal do Professor")
-        tab_cal, tab_meus = st.tabs(["📅 Calendário de Ocupação", "👤 Meus Alunos"])
+        tab_cal, tab_meus = st.tabs(["📅 Mapa de Ocupação ⭐", "👤 Meus Alunos"])
 
         aulas_raw = base.list_rows("Aulas")
         df_aulas = pd.DataFrame(aulas_raw) if aulas_raw else pd.DataFrame()
@@ -186,51 +186,60 @@ elif st.session_state['auth_status']:
         with tab_cal:
             local_sel = st.radio("Local:", ["Algés", "Oeiras"], horizontal=True)
             
-            # Lógica de Datas
+            # Cálculo de 14 dias
             hoje = datetime.now().date()
-            inicio_semana = hoje - timedelta(days=hoje.weekday()) # Segunda desta semana
-            dias_calendario = [inicio_semana + timedelta(days=i) for i in range(14)] # 14 dias (2 semanas)
+            inicio_semana = hoje - timedelta(days=hoje.weekday())
+            dias_calendario = [inicio_semana + timedelta(days=i) for i in range(14)]
             
-            # Criar matriz vazia para o calendário
             horas_dia = [f"{h:02d}:00" for h in range(8, 22)]
             col_names = [d.strftime("%a %d/%m") for d in dias_calendario]
             df_cal = pd.DataFrame("", index=horas_dia, columns=col_names)
 
             if not df_aulas.empty:
-                # Converter datas da BD para comparação
                 df_aulas['Data_Obj'] = df_aulas['Data Aula'].apply(converter_data_robusta)
                 filtro = df_aulas[df_aulas['Local'] == local_sel]
                 
                 for _, aula in filtro.iterrows():
-                    d_aula = aula['Data_Obj']
-                    h_aula = str(aula.get('Hora', ''))[:5] # Pega "HH:MM"
-                    if d_aula in dias_calendario and h_aula in horas_dia:
-                        col_idx = d_aula.strftime("%a %d/%m")
-                        # Preenche com Professor e Sala
-                        df_cal.at[h_aula, col_idx] = f"{aula['Professor']} ({aula['Sala']})"
+                    h_aula = str(aula.get('Hora', ''))[:5]
+                    if h_aula not in horas_dia: continue
+                    
+                    is_mine = (aula['Professor'] == user['display_name'])
+                    prefix = "⭐ " if is_mine else ""
+                    content = f"{prefix}{aula['Professor']} ({aula['Sala']})"
 
-            st.write(f"### Ocupação em {local_sel} (Esta e Próxima Semana)")
+                    # Lógica de preenchimento
+                    for d_cal in dias_calendario:
+                        # Se for recorrente, preenche o mesmo dia da semana. Se for pontual, só a data exata.
+                        is_recorrente = aula.get('Recorrente', False)
+                        mesmo_dia_semana = (aula['Data_Obj'].weekday() == d_cal.weekday())
+                        data_exata = (aula['Data_Obj'] == d_cal)
+
+                        if (is_recorrente and mesmo_dia_semana) or (not is_recorrente and data_exata):
+                            col_idx = d_cal.strftime("%a %d/%m")
+                            df_cal.at[h_aula, col_idx] = content
+
+            st.write(f"### Mapa de Salas - {local_sel}")
+            st.info("⭐ Marca as tuas aulas. Aulas recorrentes aparecem semanalmente.")
             st.dataframe(df_cal, use_container_width=True)
-            
-            
 
             with st.expander("➕ Marcar Nova Aula"):
-                with st.form("nova_aula"):
+                with st.form("nova_aula_rec"):
                     c1, c2 = st.columns(2)
                     al = c1.text_input("Aluno")
-                    dt_a = c2.date_input("Data da Aula", min_value=hoje)
+                    dt_a = c2.date_input("Data de Início/Aula", min_value=hoje)
                     loc = c1.selectbox("Local", ["Algés", "Oeiras"])
                     hr = c2.selectbox("Hora Início", horas_dia)
                     sl = c1.text_input("Sala")
+                    rec = st.checkbox("Aula Recorrente (Semanal)", value=True)
                     if st.form_submit_button("Confirmar"):
-                        base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": al, "Data Aula": str(dt_a), "Local": loc, "Hora": hr, "Sala": sl})
+                        base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": al, "Data Aula": str(dt_a), "Local": loc, "Hora": hr, "Sala": sl, "Recorrente": rec})
                         st.success("Registado!"); time.sleep(1); st.rerun()
 
         with tab_meus:
             if not df_aulas.empty:
                 meus = df_aulas[df_aulas['Professor'] == user['display_name']]
-                st.dataframe(meus[['Aluno', 'Local', 'Data Aula', 'Hora', 'Sala']], use_container_width=True, hide_index=True)
                 if not meus.empty:
+                    st.dataframe(meus[['Aluno', 'Local', 'Data Aula', 'Hora', 'Recorrente']], use_container_width=True, hide_index=True)
                     al_rem = st.selectbox("Remover Aula de:", meus['Aluno'].tolist())
                     if st.button("Eliminar"):
                         base.delete_row("Aulas", meus[meus['Aluno'] == al_rem].iloc[0]['_id']); st.rerun()
@@ -239,10 +248,6 @@ elif st.session_state['auth_status']:
     elif user['role'] == "Maestro":
         t1, t2, t3 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral"])
         with t1:
-            with st.expander("➕ Adicionar"):
-                with st.form("add_maestro"):
-                    n, c, l = st.text_input("Obra"), st.text_input("Compositor"), st.text_input("Link")
-                    if st.form_submit_button("Ok") and validar_link(l)[0]: base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l}); st.rerun()
             rep = base.list_rows("Repertorio")
             for r in rep or []:
                 c1, c2 = st.columns([5,1]); c1.write(f"🎵 {r.get('Nome da Obra')}")
@@ -250,6 +255,3 @@ elif st.session_state['auth_status']:
         with t2:
             evs = pd.DataFrame(base.list_rows("Eventos"))
             if not evs.empty: st.dataframe(evs[['Data', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
-        with t3:
-            aulas = pd.DataFrame(base.list_rows("Aulas"))
-            if not aulas.empty: st.dataframe(aulas[['Local', 'Professor', 'Aluno', 'Hora']], use_container_width=True, hide_index=True)
