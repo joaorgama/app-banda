@@ -132,10 +132,12 @@ elif st.session_state['auth_status']:
             if m_row:
                 with st.form("inst_form"):
                     proprio = st.checkbox("Instrumento Próprio", value=m_row.get('Instrumento Proprio', False))
-                    inst_nome = st.text_input("Instrumento", value=m_row.get('Instrumento', ''))
+                    inst_nome = st.text_input("Instrumento", value=m_row.get('Instrumento', ''), help="Ex: Trompete, Clarinete...")
+                    
+                    # Campos desativados se for instrumento próprio
                     marca = st.text_input("Marca", value=m_row.get('Marca', ''), disabled=proprio)
                     modelo = st.text_input("Modelo", value=m_row.get('Modelo', ''), disabled=proprio)
-                    n_serie = st.text_input("Número de Série", value=m_row.get('Num Serie', ''), disabled=proprio)
+                    n_serie = st.text_input("Número de Série", value=m_row.get('Num Serie', ''), disabled=proprio, help="Número único gravado no instrumento")
                     
                     if st.form_submit_button("💾 Atualizar Instrumento"):
                         update_data = {"Instrumento Proprio": proprio, "Instrumento": inst_nome}
@@ -198,7 +200,9 @@ elif st.session_state['auth_status']:
             mus_list = base.list_rows("Musicos")
             if mus_list:
                 df_inst = pd.DataFrame(mus_list)
+                # Seleção de colunas incluindo o Novo Número de Série
                 cols_show = ['Nome', 'Instrumento', 'Instrumento Proprio', 'Marca', 'Modelo', 'Num Serie']
+                # Garantir que as colunas existem no dataframe para evitar erros
                 df_final = df_inst[[c for c in cols_show if c in df_inst.columns]]
                 st.dataframe(df_final, use_container_width=True, hide_index=True)
 
@@ -243,33 +247,17 @@ elif st.session_state['auth_status']:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
             if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
 
-    # --- PAINEL PROFESSOR (OTIMIZADO) ---
+    # --- PAINEL PROFESSOR ---
     elif user['role'] == "Professor":
-        st.header("👨‍🏫 Gestão de Alunos")
-        
-        with st.expander("➕ Registar Novo Aluno"):
+        st.title("👨‍🏫 Alunos")
+        with st.expander("➕ Novo Aluno"):
             with st.form("add_al"):
                 n, c, h, s = st.text_input("Nome"), st.text_input("Contacto"), st.text_input("Horário"), st.text_input("Sala")
-                if st.form_submit_button("Confirmar Registo"):
+                if st.form_submit_button("Confirmar"):
                     base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": n, "Contacto": c, "DiaHora": h, "Sala": s}); st.rerun()
-        
-        aulas_raw = base.list_rows("Aulas")
-        if aulas_raw:
-            df_aulas = pd.DataFrame(aulas_raw)
-            meus = df_aulas[df_aulas['Professor'] == user['display_name']]
-            
-            if not meus.empty:
-                st.subheader("Meus Alunos")
-                st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
-                
-                # ÁREA DE REMOÇÃO OTIMIZADA
-                with st.expander("🗑️ Remover Aluno"):
-                    aluno_para_remover = st.selectbox("Selecione o aluno a remover:", options=meus['Aluno'].tolist())
-                    if st.button("Confirmar Remoção", type="secondary"):
-                        row_id = meus[meus['Aluno'] == aluno_para_remover].iloc[0]['_id']
-                        base.delete_row("Aulas", row_id)
-                        st.success(f"Aluno {aluno_para_remover} removido.")
-                        time.sleep(1)
-                        st.rerun()
-            else:
-                st.info("Ainda não tem alunos registados.")
+        aulas = pd.DataFrame(base.list_rows("Aulas"))
+        if not aulas.empty:
+            meus = aulas[aulas['Professor'] == user['display_name']]
+            st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
+            for i, r in meus.iterrows():
+                if st.button(f"🗑️ Remover {r['Aluno']}", key=f"dal_{i}"): base.delete_row("Aulas", r['_id']); st.rerun()
