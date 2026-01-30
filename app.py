@@ -22,20 +22,12 @@ def hash_password(password):
     return hashlib.sha256(str(password).encode()).hexdigest()
 
 def converter_data_robusta(valor):
-    """Converte qualquer retorno do SeaTable para um objeto date do Python"""
-    if not valor or str(valor) in ['None', 'nan', '']:
-        return None
-    # Se já for um objeto datetime/date
-    if isinstance(valor, (datetime, pd.Timestamp)):
-        return valor.date()
-    
+    if not valor or str(valor) in ['None', 'nan', '']: return None
+    if isinstance(valor, (datetime, pd.Timestamp)): return valor.date()
     str_data = str(valor).strip()
-    # Tenta formatos comuns (ISO, Europeu, etc)
-    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%Y/%m/%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S'):
-        try:
-            return datetime.strptime(str_data.split(' ')[0].split('T')[0], fmt).date()
-        except:
-            continue
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%Y-%m-%d %H:%M:%S'):
+        try: return datetime.strptime(str_data.split(' ')[0].split('T')[0], fmt).date()
+        except: continue
     return None
 
 def formatar_data_pt(valor):
@@ -58,22 +50,18 @@ if base and not st.session_state['auth_status']:
         if st.form_submit_button("Entrar"):
             df_u = pd.DataFrame(base.list_rows("Utilizadores"))
             match = df_u[df_u['Username'].str.lower() == u_in] if not df_u.empty else pd.DataFrame()
-            
             if not match.empty:
                 row = match.iloc[0]
                 stored_p = str(row.get('Password', DEFAULT_PASS))
                 if (p_in == stored_p) or (hash_password(p_in) == stored_p):
-                    st.session_state.update({
-                        'auth_status': True, 
-                        'must_change_pass': (stored_p == DEFAULT_PASS), 
-                        'user_info': {'username': u_in, 'display_name': row.get('Nome', u_in), 'role': row['Funcao'], 'row_id': row['_id']}
-                    })
+                    st.session_state.update({'auth_status': True, 'must_change_pass': (stored_p == DEFAULT_PASS), 
+                                             'user_info': {'username': u_in, 'display_name': row.get('Nome', u_in), 'role': row['Funcao'], 'row_id': row['_id']}})
                     st.rerun()
                 else: st.error("Password incorreta.")
             else: st.error("Utilizador não encontrado.")
 
 elif st.session_state.get('must_change_pass'):
-    st.warning("⚠️ Altere a sua password de primeiro acesso.")
+    st.warning("⚠️ Altere a sua password de primeiro acesso (1234).")
     with st.form("f_change"):
         n1, n2 = st.text_input("Nova Password", type="password"), st.text_input("Confirmar", type="password")
         if st.form_submit_button("Atualizar"):
@@ -90,7 +78,7 @@ elif st.session_state['auth_status']:
     st.sidebar.write(f"Olá, **{user['display_name']}**")
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
-    # --- MÚSICO ---
+    # --- PERFIL MÚSICO ---
     if user['role'] == "Musico":
         t1, t2, t3 = st.tabs(["📅 Agenda", "👤 Meus Dados", "🖼️ Galeria"])
         with t1:
@@ -115,16 +103,16 @@ elif st.session_state['auth_status']:
                     if st.form_submit_button("💾 Guardar"):
                         base.update_row("Musicos", m_row['_id'], {"Telefone": n_tel, "Email": n_mail, "Morada": n_morada, "Data de Nascimento": str(n_nasc)})
                         st.success("Dados guardados!"); st.rerun()
-            else: st.error("Ficha não encontrada. Peça à Direção para preencher o seu Username.")
+            else: st.error("Ficha não encontrada.")
         with t3:
             evs = base.list_rows("Eventos")
             arts = [e for e in evs if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
             if arts:
                 cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
 
-    # --- DIREÇÃO ---
+    # --- PAINEL DIREÇÃO ---
     elif user['role'] == "Direcao":
-        t1, t2, t3, t4 = st.tabs(["📅 Eventos", "🏫 Escola", "🖼️ Galeria", "📊 Status"])
+        t1, t2, t3, t4 = st.tabs(["📅 Eventos", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
         with t1:
             with st.expander("➕ Novo Evento"):
                 with st.form("ne"):
@@ -135,24 +123,49 @@ elif st.session_state['auth_status']:
             if not evs.empty:
                 evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
                 st.dataframe(evs[['Data_FT', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
-                with st.expander("🗑️ Apagar"):
+                with st.expander("🗑️ Apagar Evento"):
                     for i, r in evs.iterrows():
                         c1, c2 = st.columns([5,1]); c1.write(f"{r['Nome do Evento']}"); 
-                        if c2.button("Apagar", key=f"d_{i}"): base.delete_row("Eventos", r['_id']); st.rerun()
+                        if c2.button("Apagar", key=f"dev_{i}"): base.delete_row("Eventos", r['_id']); st.rerun()
+        with t2:
+            aulas = pd.DataFrame(base.list_rows("Aulas"))
+            if not aulas.empty:
+                st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
+        with t3:
+            evs = base.list_rows("Eventos")
+            arts = [e for e in evs if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
+            if arts:
+                cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
         with t4:
-            st.subheader("📋 Status das Fichas de Músicos")
-            m_list = base.list_rows("Musicos")
-            if m_list:
-                df_st = pd.DataFrame(m_list)
-                # Verifica pendências
-                df_st['Status Username'] = df_st['Username'].apply(lambda x: "✅ OK" if str(x) != 'None' and x != '' else "❌ Falta")
-                df_st['Status Data'] = df_st['Data de Nascimento'].apply(lambda x: "✅ OK" if str(x) != 'None' and x != '' else "⚠️ Vazio")
-                st.dataframe(df_st[['Nome', 'Status Username', 'Status Data', 'Username']], use_container_width=True, hide_index=True)
+            st.subheader("📋 Status das Fichas e Segurança")
+            mus = pd.DataFrame(base.list_rows("Musicos"))
+            uts = pd.DataFrame(base.list_rows("Utilizadores"))
+            if not mus.empty:
+                mus['Username OK'] = mus['Username'].apply(lambda x: "✅" if x else "❌")
+                st.write("**Músicos sem Username definido:**")
+                st.dataframe(mus[mus['Username OK'] == "❌"][['Nome']], use_container_width=True, hide_index=True)
+            if not uts.empty:
+                uts['Pass Segura'] = uts['Password'].apply(lambda x: "⚠️ Padrão (1234)" if x == DEFAULT_PASS else "✅ Alterada")
+                st.write("**Estado das Passwords:**")
+                st.dataframe(uts[['Nome', 'Pass Segura']], use_container_width=True, hide_index=True)
 
-    # --- PROFESSOR ---
+    # --- PAINEL PROFESSOR ---
     elif user['role'] == "Professor":
-        st.title("👨‍🏫 Alunos")
-        aulas = pd.DataFrame(base.list_rows("Aulas"))
-        if not aulas.empty:
-            meus = aulas[aulas['Professor'] == user['display_name']]
+        st.title("👨‍🏫 Gestão de Alunos")
+        with st.expander("➕ Registar Novo Aluno"):
+            with st.form("add_al"):
+                n, c, h, s = st.text_input("Nome"), st.text_input("Contacto"), st.text_input("Horário"), st.text_input("Sala")
+                if st.form_submit_button("Confirmar Registo"):
+                    base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": n, "Contacto": c, "DiaHora": h, "Sala": s})
+                    st.success("Aluno registado!"); st.rerun()
+        
+        aulas_raw = base.list_rows("Aulas")
+        if aulas_raw:
+            df_a = pd.DataFrame(aulas_raw)
+            meus = df_a[df_a['Professor'] == user['display_name']]
+            st.subheader("A Minha Lista")
             st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
+            with st.expander("🗑️ Remover Aluno"):
+                for i, r in meus.iterrows():
+                    c1, c2 = st.columns([5,1]); c1.write(f"👤 {r['Aluno']}")
+                    if c2.button("Remover", key=f"dal_{i}"): base.delete_row("Aulas", r['_id']); st.rerun()
