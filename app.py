@@ -76,7 +76,7 @@ elif st.session_state.get('must_change_pass'):
                 base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {"Password": hash_password(n1)})
                 st.session_state['must_change_pass'] = False
                 st.success("Sucesso!"); time.sleep(1); st.rerun()
-            else: st.error("Dados inválidos.")
+            else: st.error("Password inválida ou não coincidente.")
 
 # --- ÁREA LOGADA ---
 elif st.session_state['auth_status']:
@@ -85,7 +85,7 @@ elif st.session_state['auth_status']:
     st.sidebar.write(f"Olá, **{user['display_name']}**")
     if st.sidebar.button("🚪 Sair"): st.session_state.clear(); st.rerun()
 
-    # --- PERFIL MÚSICO (COMPLETO) ---
+    # --- PERFIL MÚSICO ---
     if user['role'] == "Musico":
         t1, t2, t3, t4, t5 = st.tabs(["📅 Agenda", "👤 Meus Dados", "🎷 Instrumento", "🎼 Repertório", "🖼️ Galeria"])
         musicos = base.list_rows("Musicos")
@@ -108,43 +108,67 @@ elif st.session_state['auth_status']:
                     if c3.button("❓ Talvez", key=f"t_{e['_id']}"):
                         base.query(f"DELETE FROM Presencas WHERE EventoID='{e['_id']}' AND Username='{user['username']}'")
                         base.append_row("Presencas", {"EventoID": e['_id'], "Username": user['username'], "Resposta": "Talvez"}); st.rerun()
-        with t2:
-             if m_row:
-                with st.form("f_m"):
-                    tel = st.text_input("Telefone", value=str(m_row.get('Telefone','')))
-                    ema = st.text_input("Email", value=str(m_row.get('Email','')))
-                    if st.form_submit_button("Guardar"):
-                        base.update_row("Musicos", m_row['_id'], {"Telefone": tel, "Email": ema}); st.rerun()
-        with t4:
+
+        with t2: # Meus Dados Completo
+            if m_row:
+                with st.form("ficha"):
+                    c1, c2 = st.columns(2)
+                    tel = c1.text_input("Telemóvel", value=str(m_row.get('Telefone','')).replace('.0',''))
+                    mail = c1.text_input("Email", value=str(m_row.get('Email','')))
+                    nasc = c2.date_input("Nascimento", value=converter_data_robusta(m_row.get('Data de Nascimento')) or datetime(1990,1,1))
+                    mor = c2.text_area("Morada", value=str(m_row.get('Morada','')))
+                    if st.form_submit_button("💾 Guardar"):
+                        base.update_row("Musicos", m_row['_id'], {"Telefone": tel, "Email": mail, "Morada": mor, "Data de Nascimento": str(nasc)}); st.rerun()
+
+        with t3: # Instrumento Completo
+            if m_row:
+                with st.form("inst"):
+                    prop = st.checkbox("Instrumento Próprio", value=m_row.get('Instrumento Proprio', False))
+                    inst = st.text_input("Instrumento", value=m_row.get('Instrumento', ''))
+                    marc = st.text_input("Marca", value=m_row.get('Marca', ''), disabled=prop)
+                    seri = st.text_input("Série", value=m_row.get('Num Serie', ''), disabled=prop)
+                    if st.form_submit_button("💾 Atualizar"):
+                        base.update_row("Musicos", m_row['_id'], {"Instrumento Proprio": prop, "Instrumento": inst, "Marca": marc if not prop else "", "Num Serie": seri if not prop else ""}); st.rerun()
+
+        with t4: # Repertório Completo
             rep = base.list_rows("Repertorio")
             for r in rep or []:
-                with st.expander(f"🎼 {r.get('Nome da Obra')}"):
+                with st.expander(f"🎼 {r.get('Nome da Obra', 'S/ Nome')}"):
+                    st.write(f"**Compositor:** {r.get('Compositor', '---')}")
                     l = r.get('Links', '')
-                    if l: st.video(l) if "youtube" in l else st.link_button("Ver", l)
+                    if l: st.video(l) if "youtube" in l else st.link_button("Abrir Partitura", l)
 
-    # --- PERFIL PROFESSOR (RESTAURADO COM CALENDÁRIO) ---
+        with t5: # Galeria
+            arts = [e for e in base.list_rows("Eventos") if e.get('Cartaz')]
+            if arts:
+                cols = st.columns(3)
+                for i, ev in enumerate(arts): cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento'])
+
+    # --- PERFIL PROFESSOR (GESTÃO + CALENDÁRIO) ---
     elif user['role'] == "Professor":
-        st.header("👨‍🏫 Gestão de Alunos")
-        t_list, t_map = st.tabs(["👥 Meus Alunos", "📅 Mapa de Ocupação ⭐"])
+        st.header("👨‍🏫 Gestão de Aulas")
+        tab_al, tab_map = st.tabs(["👥 Meus Alunos", "📅 Mapa de Ocupação ⭐"])
         
-        with t_list:
+        with tab_al:
             with st.expander("➕ Novo Aluno"):
                 with st.form("add_al"):
                     n, c, h, s = st.text_input("Nome"), st.text_input("Contacto"), st.text_input("Horário (ex: Segunda 14h)"), st.text_input("Sala")
                     if st.form_submit_button("Registar"):
                         base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": n, "Contacto": c, "DiaHora": h, "Sala": s}); st.rerun()
             
-            aulas = base.list_rows("Aulas")
-            if aulas:
-                df_a = pd.DataFrame(aulas)
+            a_raw = base.list_rows("Aulas")
+            if a_raw:
+                df_a = pd.DataFrame(a_raw)
                 meus = df_a[df_a['Professor'] == user['display_name']]
                 if not meus.empty:
                     st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
-                    if st.button("🗑️ Remover Selecionado"):
-                        # Lógica de remoção...
-                        pass
+                    with st.expander("🗑️ Remover Aluno"):
+                        al_r = st.selectbox("Aluno:", options=meus['Aluno'].tolist())
+                        if st.button("Confirmar Remoção"):
+                            rid = meus[meus['Aluno'] == al_r].iloc[0]['_id']
+                            base.delete_row("Aulas", rid); st.rerun()
         
-        with t_map:
+        with tab_map:
             st.subheader("Ocupação Semanal")
             dias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
             horas = [f"{h:02d}:00" for h in range(8, 22)]
@@ -162,21 +186,43 @@ elif st.session_state['auth_status']:
                                 df_m.at[h_key, d] = f"{mark}{a.get('Professor')} ({a.get('Sala')})"
             st.table(df_m)
 
-    # --- PERFIL DIREÇÃO (COMPLETO) ---
+    # --- PERFIL DIREÇÃO ---
     elif user['role'] == "Direcao":
-        t1, t2, t3, t4, t5 = st.tabs(["📅 Eventos", "🎷 Inventário", "🏫 Escola Geral", "🖼️ Galeria", "📊 Status"])
-        with t3:
+        t1, t2, t3, t4, t5 = st.tabs(["📅 Eventos", "🎷 Inventário", "🏫 Escola Geral", "📊 Status", "🖼️ Galeria"])
+        with t1: # Gestão de Eventos Completo
+            with st.expander("➕ Novo Evento"):
+                with st.form("ne"):
+                    n, d, h = st.text_input("Nome"), st.date_input("Data"), st.text_input("Hora")
+                    c = st.text_input("URL Cartaz")
+                    if st.form_submit_button("Criar"):
+                        base.append_row("Eventos", {"Nome do Evento": n, "Data": str(d), "Hora": h, "Cartaz": c}); st.rerun()
+            evs = base.list_rows("Eventos")
+            for e in evs:
+                with st.expander(f"📝 {e.get('Nome do Evento')}"):
+                    if st.button("🗑️ Apagar", key=f"del_{e['_id']}"): base.delete_row("Eventos", e['_id']); st.rerun()
+        with t2: # Inventário
+            mus = base.list_rows("Musicos")
+            if mus: st.dataframe(pd.DataFrame(mus)[['Nome', 'Instrumento', 'Marca', 'Num Serie']], use_container_width=True)
+        with t3: # Escola Geral
             aulas = base.list_rows("Aulas")
             if aulas: st.dataframe(pd.DataFrame(aulas)[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True)
-        with t5:
+        with t4: # Status
             mus = base.list_rows("Musicos")
-            if mus: st.dataframe(pd.DataFrame(mus)[['Nome', 'Instrumento', 'Telefone']], use_container_width=True)
+            if mus:
+                st_list = [{"Nome": m.get('Nome'), "Estado": "✅ OK" if m.get('Telefone') and m.get('Email') else "❌ Incompleto"} for m in mus]
+                st.table(pd.DataFrame(st_list))
 
-    # --- PERFIL MAESTRO (COMPLETO) ---
+    # --- PERFIL MAESTRO ---
     elif user['role'] == "Maestro":
-        t1, t2 = st.tabs(["🎼 Repertório", "📅 Agenda"])
-        with t1:
-             with st.form("add_r"):
-                n, c, l = st.text_input("Obra"), st.text_input("Compositor"), st.text_input("Link")
-                if st.form_submit_button("Publicar"):
-                    base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l}); st.rerun()
+        t1, t2, t3 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral"])
+        with t1: # Gestão de Repertório
+            with st.expander("➕ Adicionar Obra"):
+                with st.form("add_rep"):
+                    n, c, l = st.text_input("Nome"), st.text_input("Compositor"), st.text_input("Link")
+                    if st.form_submit_button("Publicar"):
+                        base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l}); st.rerun()
+            rep = base.list_rows("Repertorio")
+            for r in rep or []:
+                c1, c2 = st.columns([4,1])
+                c1.write(f"🎵 {r.get('Nome da Obra')} - {r.get('Compositor')}")
+                if c2.button("Remover", key=f"rem_{r['_id']}"): base.delete_row("Repertorio", r['_id']); st.rerun()
