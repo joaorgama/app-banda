@@ -110,10 +110,11 @@ elif st.session_state['auth_status']:
                 for r in rep:
                     with st.expander(f"🎵 {r.get('Nome da Obra', 'S/ Nome')}"):
                         st.write(f"**Compositor:** {r.get('Compositor', '---')}")
-                        if r.get('Links'): st.video(r['Links']) if "youtube" in r['Links'] else st.link_button("Ver Link Externo", r['Links'])
+                        l = r.get('Links', '')
+                        if l: st.video(l) if "youtube.com" in l or "youtu.be" in l else st.link_button("Abrir Link", l)
         with t4:
-            evs = base.list_rows("Eventos")
-            arts = [e for e in evs if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
+            evs_gal = base.list_rows("Eventos")
+            arts = [e for e in evs_gal if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
             if arts:
                 cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
 
@@ -137,57 +138,61 @@ elif st.session_state['auth_status']:
         with t2:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
             if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
+        with t3:
+            evs_gal = base.list_rows("Eventos")
+            arts = [e for e in evs_gal if e.get('Cartaz') and str(e['Cartaz']).startswith('http')]
+            if arts:
+                cols = st.columns(3); [cols[i%3].image(ev['Cartaz'], caption=ev['Nome do Evento']) for i, ev in enumerate(arts)]
         with t4:
             st.subheader("📋 Status e Exportação")
             mus_raw = base.list_rows("Musicos")
             if mus_raw:
-                status_list = []
+                st_list = []
                 for m in mus_raw:
                     faltam = [f for f in ["Username", "Telefone", "Email", "Morada", "Data de Nascimento"] if not m.get(f)]
-                    status_list.append({"Nome": m.get('Nome'), "Estado": "✅ OK" if not faltam else f"❌ Falta: {', '.join(faltam)}"})
-                df_status = pd.DataFrame(status_list)
-                st.dataframe(df_status, use_container_width=True, hide_index=True)
-                
-                # BOTÃO DE EXPORTAÇÃO
-                csv = df_status.to_csv(index=False).encode('utf-8-sig')
-                st.download_button("📥 Descarregar Lista de Pendências (CSV)", csv, "status_musicos.csv", "text/csv")
+                    st_list.append({"Nome": m.get('Nome'), "Estado": "✅ OK" if not faltam else f"❌ Falta: {', '.join(faltam)}"})
+                df_st = pd.DataFrame(st_list)
+                st.dataframe(df_st, use_container_width=True, hide_index=True)
+                csv = df_st.to_csv(index=False).encode('utf-8-sig')
+                st.download_button("📥 Descarregar CSV", csv, "status_musicos.csv", "text/csv")
 
     # --- PAINEL MAESTRO ---
     elif user['role'] == "Maestro":
-        t1, t2, t3, t4 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral", "📊 Status"])
+        t1, t2, t3 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral"])
         with t1:
             st.subheader("Gerir Repertório")
             with st.expander("➕ Adicionar Obra"):
                 with st.form("add_rep"):
-                    n, c, l = st.text_input("Nome da Obra"), st.text_input("Compositor"), st.text_input("Link (Youtube/Drive)")
-                    if st.form_submit_button("Publicar Repertório"):
+                    n, c, l = st.text_input("Nome da Obra"), st.text_input("Compositor"), st.text_input("Link (Drive/Youtube)")
+                    if st.form_submit_button("Publicar"):
                         base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l}); st.rerun()
-            
-            repertorio = base.list_rows("Repertorio")
-            if repertorio:
-                for idx, r in enumerate(repertorio):
-                    c1, c2 = st.columns([5,1])
-                    c1.write(f"🎵 **{r.get('Nome da Obra')}** - {r.get('Compositor')}")
-                    if c2.button("Apagar", key=f"del_rep_{idx}"):
-                        base.delete_row("Repertorio", r['_id']); st.rerun()
+            rep = base.list_rows("Repertorio")
+            if rep:
+                for idx, r in enumerate(rep):
+                    c1, c2 = st.columns([5,1]); c1.write(f"🎵 **{r.get('Nome da Obra')}** - {r.get('Compositor')}")
+                    if c2.button("Remover", key=f"del_rep_{idx}"): base.delete_row("Repertorio", r['_id']); st.rerun()
         with t2:
             evs = pd.DataFrame(base.list_rows("Eventos"))
-            if not evs.empty: st.dataframe(evs[['Data', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
+            if not evs.empty:
+                evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
+                st.dataframe(evs[['Data_FT', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
         with t3:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
-            if not aulas.empty: st.dataframe(aulas, use_container_width=True, hide_index=True)
+            if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
 
     # --- PAINEL PROFESSOR ---
     elif user['role'] == "Professor":
         st.title("👨‍🏫 Gestão de Alunos")
-        with st.expander("➕ Registar Novo Aluno"):
+        with st.expander("➕ Novo Aluno"):
             with st.form("add_al"):
                 n, c, h, s = st.text_input("Nome"), st.text_input("Contacto"), st.text_input("Horário"), st.text_input("Sala")
-                if st.form_submit_button("Confirmar Registo"):
-                    base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": n, "Contacto": c, "DiaHora": h, "Sala": s})
-                    st.success("Aluno registado!"); st.rerun()
-        aulas_raw = base.list_rows("Aulas")
-        if aulas_raw:
-            df_a = pd.DataFrame(aulas_raw)
-            meus = df_a[df_a['Professor'] == user['display_name']]
+                if st.form_submit_button("Confirmar"):
+                    base.append_row("Aulas", {"Professor": user['display_name'], "Aluno": n, "Contacto": c, "DiaHora": h, "Sala": s}); st.rerun()
+        aulas = pd.DataFrame(base.list_rows("Aulas"))
+        if not aulas.empty:
+            meus = aulas[aulas['Professor'] == user['display_name']]
             st.dataframe(meus[['Aluno', 'Contacto', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
+            with st.expander("🗑️ Remover"):
+                for i, r in meus.iterrows():
+                    c1, c2 = st.columns([5,1]); c1.write(f"👤 {r['Aluno']}")
+                    if c2.button("Apagar", key=f"dal_{i}"): base.delete_row("Aulas", r['_id']); st.rerun()
