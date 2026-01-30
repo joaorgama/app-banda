@@ -36,7 +36,6 @@ def formatar_data_pt(valor):
     return dt.strftime('%d/%m/%Y') if dt else "---"
 
 def validar_link(url):
-    """Valida se o link é uma URL e se tem formato de partilha do Drive"""
     if not url: return True, ""
     if not re.match(r'^https?://', url):
         return False, "❌ O link deve começar por http:// ou https://"
@@ -87,11 +86,10 @@ elif st.session_state['auth_status']:
     st.sidebar.title("🎵 BMO")
     st.sidebar.write(f"Olá, **{user['display_name']}**")
     
-    # --- GUIA DO MAESTRO NA SIDEBAR ---
     if user['role'] == "Maestro":
         with st.sidebar.expander("📖 Guia de Links (Drive)"):
             st.caption("Como partilhar:")
-            st.write("1. No Google Drive, clique com o botão direito no ficheiro.")
+            st.write("1. No Drive, clique com o botão direito no ficheiro.")
             st.write("2. Escolha **Partilhar**.")
             st.write("3. Mude para **'Qualquer pessoa com o link'**.")
             st.write("4. Copie o link e cole no Repertório.")
@@ -105,7 +103,8 @@ elif st.session_state['auth_status']:
             evs = pd.DataFrame(base.list_rows("Eventos"))
             if not evs.empty:
                 evs['Data Visual'] = evs['Data'].apply(formatar_data_pt)
-                st.dataframe(evs[['Data Visual', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
+                evs['Hora Visual'] = evs['Hora'].apply(lambda x: str(x) if x else "---")
+                st.dataframe(evs[['Data Visual', 'Hora Visual', 'Nome do Evento', 'Tipo']], hide_index=True, use_container_width=True)
         with t2:
             musicos = base.list_rows("Musicos")
             m_row = next((r for r in musicos if str(r.get('Username','')).lower() == user['username']), None)
@@ -144,16 +143,21 @@ elif st.session_state['auth_status']:
         with t1:
             with st.expander("➕ Novo Evento"):
                 with st.form("ne"):
-                    n, d, t, c = st.text_input("Nome"), st.date_input("Data"), st.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada"]), st.text_input("URL Cartaz")
-                    if st.form_submit_button("Criar"):
-                        base.append_row("Eventos", {"Nome do Evento": n, "Data": str(d), "Tipo": t, "Cartaz": c}); st.rerun()
+                    col_e1, col_e2 = st.columns(2)
+                    n = col_e1.text_input("Nome do Evento")
+                    d = col_e2.date_input("Data")
+                    h = col_e1.text_input("Hora (ex: 21:00)")
+                    t = col_e2.selectbox("Tipo", ["Ensaio", "Concerto", "Arruada", "Outro"])
+                    c = st.text_input("URL Cartaz")
+                    if st.form_submit_button("Criar Evento"):
+                        base.append_row("Eventos", {"Nome do Evento": n, "Data": str(d), "Hora": h, "Tipo": t, "Cartaz": c}); st.rerun()
             evs = pd.DataFrame(base.list_rows("Eventos"))
             if not evs.empty:
                 evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
-                st.dataframe(evs[['Data_FT', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
+                st.dataframe(evs[['Data_FT', 'Hora', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
                 with st.expander("🗑️ Apagar"):
                     for i, r in evs.iterrows():
-                        c1, c2 = st.columns([5,1]); c1.write(f"{r['Nome do Evento']}"); 
+                        c1, c2 = st.columns([5,1]); c1.write(f"{r['Data_FT']} {r.get('Hora','')} - {r['Nome do Evento']}")
                         if c2.button("Apagar", key=f"dev_{i}"): base.delete_row("Eventos", r['_id']); st.rerun()
         with t2:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
@@ -181,19 +185,16 @@ elif st.session_state['auth_status']:
         t1, t2, t3 = st.tabs(["🎼 Repertório", "📅 Agenda", "🏫 Escola Geral"])
         with t1:
             st.subheader("Gerir Repertório")
-            with st.expander("➕ Adicionar Obra em Trabalho"):
+            with st.expander("➕ Adicionar Obra"):
                 with st.form("add_rep"):
                     n, c = st.text_input("Nome da Obra"), st.text_input("Compositor")
                     l = st.text_input("Link (Drive/Youtube)")
-                    
                     ok, msg = validar_link(l)
                     if not ok: st.error(msg)
                     elif msg: st.warning(msg)
-                    
-                    if st.form_submit_button("Publicar para Músicos") and ok:
+                    if st.form_submit_button("Publicar") and ok:
                         base.append_row("Repertorio", {"Nome da Obra": n, "Compositor": c, "Links": l})
-                        st.success("Repertório publicado!"); time.sleep(1); st.rerun()
-            
+                        st.success("Publicado!"); time.sleep(1); st.rerun()
             rep = base.list_rows("Repertorio")
             if rep:
                 for idx, r in enumerate(rep):
@@ -203,7 +204,7 @@ elif st.session_state['auth_status']:
             evs = pd.DataFrame(base.list_rows("Eventos"))
             if not evs.empty:
                 evs['Data_FT'] = evs['Data'].apply(formatar_data_pt)
-                st.dataframe(evs[['Data_FT', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
+                st.dataframe(evs[['Data_FT', 'Hora', 'Nome do Evento', 'Tipo']], use_container_width=True, hide_index=True)
         with t3:
             aulas = pd.DataFrame(base.list_rows("Aulas"))
             if not aulas.empty: st.dataframe(aulas[['Professor', 'Aluno', 'DiaHora', 'Sala']], use_container_width=True, hide_index=True)
