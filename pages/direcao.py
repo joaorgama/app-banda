@@ -10,11 +10,13 @@ def render(base, user):
     """Renderiza interface da direção"""
     st.title("📊 Painel da Direção")
     
-    t1, t2, t3, t4 = st.tabs([
+    # Tabs com Mensagens adicionada
+    t1, t2, t3, t4, t5 = st.tabs([
         "📅 Eventos",
         "🎷 Inventário",
         "🏫 Escola",
-        "📊 Status Geral"
+        "📊 Status Geral",
+        "💬 Mensagens"
     ])
     
     # ========================================
@@ -395,3 +397,10 @@ def render(base, user):
         
         except Exception as e:
             st.error(f"Erro: {e}")
+    
+    # ========================================
+    # TAB 5: MENSAGENS (COM PODER DE APAGAR)
+    # ========================================
+    with t5:
+        from mensagens import render_chat
+        render_chat(base, user, pode_apagar=True)  # Direção pode apagar!
