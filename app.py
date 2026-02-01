@@ -51,6 +51,54 @@ if not base:
     st.stop()
 
 # ============================================
+# FORÇAR MUDANÇA DE PASSWORD
+# ============================================
+
+if st.session_state['auth_status'] and st.session_state['must_change_pass']:
+    st.warning("⚠️ **ATENÇÃO:** Está a usar a password padrão. Por razões de segurança, deve alterá-la.")
+    
+    user = st.session_state['user_info']
+    
+    st.title("🔒 Alterar Password")
+    st.write(f"Olá **{user['display_name']}**, bem-vindo(a) ao Portal BMO!")
+    st.info("Por favor, defina uma nova password antes de continuar.")
+    
+    with st.form("change_password"):
+        new_pass = st.text_input(
+            "🔑 Nova Password",
+            type="password",
+            help="Mínimo 4 caracteres"
+        )
+        
+        confirm_pass = st.text_input(
+            "🔑 Confirmar Password",
+            type="password"
+        )
+        
+        if st.form_submit_button("💾 Guardar Nova Password", use_container_width=True):
+            if len(new_pass) < 4:
+                st.error("❌ A password deve ter pelo menos 4 caracteres")
+            elif new_pass != confirm_pass:
+                st.error("❌ As passwords não coincidem")
+            elif new_pass == DEFAULT_PASS:
+                st.error("❌ Não pode usar a password padrão '1234'")
+            else:
+                try:
+                    # Atualizar password na base de dados (com hash)
+                    base.update_row("Utilizadores", user['row_id'], {
+                        "Password": hash_password(new_pass)
+                    })
+                    
+                    st.session_state['must_change_pass'] = False
+                    st.success("✅ Password alterada com sucesso!")
+                    st.balloons()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"❌ Erro ao alterar password: {e}")
+    
+    st.stop()
+
+# ============================================
 # PÁGINA DE LOGIN
 # ============================================
 
@@ -77,13 +125,13 @@ if not st.session_state['auth_status']:
             
             u_in = st.text_input(
                 "👤 Utilizador",
-                placeholder="Digite o seu username"
+                placeholder="Introduza o seu username"
             ).strip().lower()
             
             p_in = st.text_input(
                 "🔒 Password",
                 type="password",
-                placeholder="Digite a sua password"
+                placeholder="Introduza a sua password"
             ).strip()
             
             submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
@@ -122,7 +170,7 @@ if not st.session_state['auth_status']:
                                             'row_id': row['_id']
                                         }
                                     })
-                                    st.success(f"✅ Bem-vindo, {row.get('Nome', u_in)}!")
+                                    st.success(f"✅ Bem-vindo(a), {row.get('Nome', u_in)}!")
                                     st.rerun()
                                 else:
                                     st.error("❌ Password incorreta")
@@ -201,7 +249,7 @@ else:
             st.rerun()
 
 # ============================================
-# FOOTER (OPCIONAL)
+# FOOTER
 # ============================================
 
 st.markdown("---")
