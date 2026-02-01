@@ -9,13 +9,13 @@ def render(base, user):
     """Renderiza interface do maestro"""
     st.title("🎼 Painel do Maestro")
     
-    t1, t2 = st.tabs(["🎼 Repertório", "📅 Agenda de Eventos"])
+    t1, t2 = st.tabs(["🎼 Reportório", "📅 Agenda de Eventos"])
     
     # ========================================
-    # TAB 1: GESTÃO DE REPERTÓRIO
+    # TAB 1: GESTÃO DE REPORTÓRIO
     # ========================================
     with t1:
-        st.subheader("🎵 Repertório da Banda")
+        st.subheader("🎵 Reportório da Banda")
         
         # Adicionar nova obra
         with st.expander("➕ Adicionar Nova Obra", expanded=False):
@@ -57,12 +57,12 @@ def render(base, user):
         
         st.divider()
         
-        # Listar repertório
+        # Listar reportório
         try:
             repertorio = base.list_rows("Repertorio")
             
             if not repertorio:
-                st.info("📭 Nenhuma obra no repertório")
+                st.info("📭 Nenhuma obra no reportório")
             else:
                 st.write(f"**Total de obras:** {len(repertorio)}")
                 
@@ -94,7 +94,7 @@ def render(base, user):
                         st.divider()
         
         except Exception as e:
-            st.error(f"Erro ao carregar repertório: {e}")
+            st.error(f"Erro ao carregar reportório: {e}")
     
     # ========================================
     # TAB 2: AGENDA DE EVENTOS
