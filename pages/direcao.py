@@ -105,41 +105,46 @@ def render(base, user):
                         st.divider()
                         
                         # ========================================
-                        # LISTA DETALHADA DE PRESENÇAS POR NAIPE
+                        # LISTA DETALHADA DE PRESENÇAS
                         # ========================================
-                        st.subheader("🎼 Presenças por Músico e Naipe")
-                        
-                        # Criar dicionário de respostas
-                        respostas_dict = {}
-                        for p in pres_evento:
-                            username_p = p.get('Username')
-                            if username_p:
-                                # Garantir que é string antes de fazer lower()
-                                username_key = str(username_p).lower().strip()
-                                respostas_dict[username_key] = p.get('Resposta')
-                        
-                        # Criar lista com todos os músicos e suas respostas
-                        lista_musicos = []
-                        for m in musicos:
-                            # Verificação segura do username
-                            username_raw = m.get('Username')
-                            if username_raw and str(username_raw).strip():
-                                username = str(username_raw).lower().strip()
-                            else:
-                                # Se não tem username, usar o nome como identificador
-                                username = str(m.get('Nome', '')).lower().strip()
+                        if musicos:
+                            st.subheader("🎼 Presenças por Músico")
                             
-                            nome = m.get('Nome', 'Desconhecido')
-                            instrumento = m.get('Instrumento', 'Não definido')
-                            resposta = respostas_dict.get(username, 'Pendente')
+                            # Criar dicionário de respostas
+                            respostas_dict = {}
+                            for p in pres_evento:
+                                username_p = p.get('Username')
+                                if username_p:
+                                    username_key = str(username_p).lower().strip()
+                                    respostas_dict[username_key] = p.get('Resposta')
                             
-                            lista_musicos.append({
-                                'Nome': nome,
-                                'Instrumento': instrumento,
-                                'Resposta': resposta
-                            })
-                        
-                        if lista_musicos:
+                            # Criar lista com todos os músicos e suas respostas
+                            lista_musicos = []
+                            for m in musicos:
+                                # Verificação segura do username
+                                username_raw = m.get('Username')
+                                if username_raw and str(username_raw).strip():
+                                    username = str(username_raw).lower().strip()
+                                else:
+                                    username = str(m.get('Nome', '')).lower().strip()
+                                
+                                nome = m.get('Nome', 'Desconhecido')
+                                
+                                # Verificação segura do instrumento
+                                instrumento_raw = m.get('Instrumento')
+                                if instrumento_raw and str(instrumento_raw).strip():
+                                    instrumento = str(instrumento_raw).strip()
+                                else:
+                                    instrumento = "Não definido"
+                                
+                                resposta = respostas_dict.get(username, 'Pendente')
+                                
+                                lista_musicos.append({
+                                    'Nome': nome,
+                                    'Instrumento': instrumento,
+                                    'Resposta': resposta
+                                })
+                            
                             # Criar DataFrame
                             df_musicos = pd.DataFrame(lista_musicos)
                             
@@ -158,9 +163,10 @@ def render(base, user):
                                 )
                             
                             with col_filtro2:
-                                # Contar instrumentos únicos
-                                instrumentos_unicos = df_musicos['Instrumento'].unique()
-                                st.caption(f"📊 Naipes presentes: {len(instrumentos_unicos)}")
+                                # Contar instrumentos únicos (excluindo "Não definido")
+                                instrumentos_definidos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
+                                num_naipes = len(instrumentos_definidos['Instrumento'].unique()) if not instrumentos_definidos.empty else 0
+                                st.caption(f"📊 Naipes definidos: {num_naipes}")
                             
                             # Aplicar filtro
                             df_filtrado = df_musicos[df_musicos['Resposta'].isin(filtro_resposta)]
@@ -190,60 +196,66 @@ def render(base, user):
                                 }
                             )
                             
-                            st.divider()
-                            
                             # ========================================
-                            # ANÁLISE POR NAIPE
+                            # ANÁLISE POR NAIPE (só se houver instrumentos definidos)
                             # ========================================
-                            st.subheader("📊 Análise por Naipe")
+                            instrumentos_validos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
                             
-                            # Agrupar por instrumento
-                            naipes_stats = []
-                            for inst in sorted(df_musicos['Instrumento'].unique()):
-                                df_inst = df_musicos[df_musicos['Instrumento'] == inst]
-                                total = len(df_inst)
-                                vao_inst = len(df_inst[df_inst['Resposta'] == 'Vou'])
-                                nao_vao_inst = len(df_inst[df_inst['Resposta'] == 'Não Vou'])
-                                talvez_inst = len(df_inst[df_inst['Resposta'] == 'Talvez'])
-                                pend_inst = len(df_inst[df_inst['Resposta'] == 'Pendente'])
+                            if not instrumentos_validos.empty:
+                                st.divider()
+                                st.subheader("📊 Análise por Naipe")
                                 
-                                naipes_stats.append({
-                                    'Naipe': inst,
-                                    'Total': total,
-                                    '✅ Vão': vao_inst,
-                                    '❌ Não Vão': nao_vao_inst,
-                                    '❓ Talvez': talvez_inst,
-                                    '⏳ Pendentes': pend_inst
-                                })
-                            
-                            df_naipes = pd.DataFrame(naipes_stats)
-                            
-                            # Exibir tabela de naipes
-                            st.dataframe(
-                                df_naipes,
-                                use_container_width=True,
-                                hide_index=True,
-                                column_config={
-                                    "Naipe": st.column_config.TextColumn("🎷 Naipe", width="medium"),
-                                    "Total": st.column_config.NumberColumn("👥 Total", width="small"),
-                                    "✅ Vão": st.column_config.NumberColumn("✅ Vão", width="small"),
-                                    "❌ Não Vão": st.column_config.NumberColumn("❌ Não", width="small"),
-                                    "❓ Talvez": st.column_config.NumberColumn("❓ Talvez", width="small"),
-                                    "⏳ Pendentes": st.column_config.NumberColumn("⏳ Pend.", width="small")
-                                }
-                            )
-                            
-                            # Alerta de naipes vazios
-                            naipes_vazios = df_naipes[df_naipes['✅ Vão'] == 0]
-                            if not naipes_vazios.empty:
-                                st.warning(f"⚠️ **Atenção:** Os seguintes naipes não têm confirmações: {', '.join(naipes_vazios['Naipe'].tolist())}")
+                                # Agrupar por instrumento
+                                naipes_stats = []
+                                for inst in sorted(instrumentos_validos['Instrumento'].unique()):
+                                    df_inst = df_musicos[df_musicos['Instrumento'] == inst]
+                                    total = len(df_inst)
+                                    vao_inst = len(df_inst[df_inst['Resposta'] == 'Vou'])
+                                    nao_vao_inst = len(df_inst[df_inst['Resposta'] == 'Não Vou'])
+                                    talvez_inst = len(df_inst[df_inst['Resposta'] == 'Talvez'])
+                                    pend_inst = len(df_inst[df_inst['Resposta'] == 'Pendente'])
+                                    
+                                    naipes_stats.append({
+                                        'Naipe': inst,
+                                        'Total': total,
+                                        '✅ Vão': vao_inst,
+                                        '❌ Não Vão': nao_vao_inst,
+                                        '❓ Talvez': talvez_inst,
+                                        '⏳ Pendentes': pend_inst
+                                    })
+                                
+                                if naipes_stats:
+                                    df_naipes = pd.DataFrame(naipes_stats)
+                                    
+                                    # Exibir tabela de naipes
+                                    st.dataframe(
+                                        df_naipes,
+                                        use_container_width=True,
+                                        hide_index=True,
+                                        column_config={
+                                            "Naipe": st.column_config.TextColumn("🎷 Naipe", width="medium"),
+                                            "Total": st.column_config.NumberColumn("👥 Total", width="small"),
+                                            "✅ Vão": st.column_config.NumberColumn("✅ Vão", width="small"),
+                                            "❌ Não Vão": st.column_config.NumberColumn("❌ Não", width="small"),
+                                            "❓ Talvez": st.column_config.NumberColumn("❓ Talvez", width="small"),
+                                            "⏳ Pendentes": st.column_config.NumberColumn("⏳ Pend.", width="small")
+                                        }
+                                    )
+                                    
+                                    # Alerta de naipes vazios
+                                    naipes_vazios = df_naipes[df_naipes['✅ Vão'] == 0]
+                                    if not naipes_vazios.empty and len(naipes_vazios) > 0:
+                                        naipes_lista = naipes_vazios['Naipe'].tolist()
+                                        if naipes_lista:
+                                            st.warning(f"⚠️ **Atenção:** Os seguintes naipes não têm confirmações: {', '.join(naipes_lista)}")
+                            else:
+                                st.info("ℹ️ Os músicos ainda não têm instrumentos definidos. Peça-lhes para preencherem essa informação no perfil.")
                         
                         else:
                             st.info("Nenhum músico registado no sistema")
         
         except Exception as e:
-            st.error(f"Erro ao carregar eventos: {e}")
-            st.exception(e)
+            st.error(f"❌ Erro ao carregar eventos: {str(e)}")
     
     # ========================================
     # TAB 2: INVENTÁRIO DE INSTRUMENTOS
@@ -259,29 +271,33 @@ def render(base, user):
             else:
                 df_mus = pd.DataFrame(musicos)
                 
-                # Estatísticas
-                col1, col2, col3 = st.columns(3)
-                
-                total_inst = df_mus['Instrumento'].notna().sum()
-                proprios = df_mus['Instrumento Proprio'].sum() if 'Instrumento Proprio' in df_mus.columns else 0
-                banda = total_inst - proprios
-                
-                col1.metric("Total Instrumentos", total_inst)
-                col2.metric("Próprios", proprios)
-                col3.metric("Da Banda", banda)
-                
-                st.divider()
-                
-                # Tabela
-                colunas_mostrar = ['Nome', 'Instrumento', 'Marca', 'Modelo', 'Num Serie']
-                colunas_existentes = [c for c in colunas_mostrar if c in df_mus.columns]
-                
-                if colunas_existentes:
-                    st.dataframe(
-                        df_mus[colunas_existentes],
-                        use_container_width=True,
-                        hide_index=True
-                    )
+                # Verificar se tem a coluna Instrumento
+                if 'Instrumento' in df_mus.columns:
+                    # Estatísticas
+                    col1, col2, col3 = st.columns(3)
+                    
+                    total_inst = df_mus['Instrumento'].notna().sum()
+                    proprios = df_mus['Instrumento Proprio'].sum() if 'Instrumento Proprio' in df_mus.columns else 0
+                    banda = total_inst - proprios
+                    
+                    col1.metric("Total Instrumentos", total_inst)
+                    col2.metric("Próprios", proprios)
+                    col3.metric("Da Banda", banda)
+                    
+                    st.divider()
+                    
+                    # Tabela
+                    colunas_mostrar = ['Nome', 'Instrumento', 'Marca', 'Modelo', 'Num Serie']
+                    colunas_existentes = [c for c in colunas_mostrar if c in df_mus.columns]
+                    
+                    if colunas_existentes:
+                        st.dataframe(
+                            df_mus[colunas_existentes],
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                else:
+                    st.info("ℹ️ Ainda não há dados de instrumentos. Os músicos devem preencher essa informação nos seus perfis.")
         
         except Exception as e:
             st.error(f"Erro: {e}")
