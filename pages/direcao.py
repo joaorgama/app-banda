@@ -112,12 +112,23 @@ def render(base, user):
                         # Criar dicionário de respostas
                         respostas_dict = {}
                         for p in pres_evento:
-                            respostas_dict[p.get('Username')] = p.get('Resposta')
+                            username_p = p.get('Username')
+                            if username_p:
+                                # Garantir que é string antes de fazer lower()
+                                username_key = str(username_p).lower().strip()
+                                respostas_dict[username_key] = p.get('Resposta')
                         
                         # Criar lista com todos os músicos e suas respostas
                         lista_musicos = []
                         for m in musicos:
-                            username = m.get('Username', '').lower()
+                            # Verificação segura do username
+                            username_raw = m.get('Username')
+                            if username_raw and str(username_raw).strip():
+                                username = str(username_raw).lower().strip()
+                            else:
+                                # Se não tem username, usar o nome como identificador
+                                username = str(m.get('Nome', '')).lower().strip()
+                            
                             nome = m.get('Nome', 'Desconhecido')
                             instrumento = m.get('Instrumento', 'Não definido')
                             resposta = respostas_dict.get(username, 'Pendente')
@@ -231,7 +242,8 @@ def render(base, user):
                             st.info("Nenhum músico registado no sistema")
         
         except Exception as e:
-            st.error(f"Erro: {e}")
+            st.error(f"Erro ao carregar eventos: {e}")
+            st.exception(e)
     
     # ========================================
     # TAB 2: INVENTÁRIO DE INSTRUMENTOS
