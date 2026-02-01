@@ -44,7 +44,7 @@ base = get_base()
 
 # --- LOGIN ---
 if base and not st.session_state['auth_status']:
-    st.header("🎵 Portal da Banda Municipal de Oeiras")
+    st.header("🎵 Banda Municipal de Oeiras")
     with st.form("login"):
         u_in = st.text_input("Utilizador").strip().lower()
         p_in = st.text_input("Password", type="password").strip()
