@@ -9,7 +9,7 @@ def render(base, user):
     """Renderiza interface do maestro"""
     st.title("🎼 Painel do Maestro")
     
-    t1, t2 = st.tabs(["🎼 Reportório", "📅 Agenda de Eventos"])
+    t1, t2, t3 = st.tabs(["🎼 Reportório", "📅 Agenda de Eventos", "🖼️ Galeria"])
     
     # ========================================
     # TAB 1: GESTÃO DE REPORTÓRIO
@@ -143,3 +143,29 @@ def render(base, user):
         
         except Exception as e:
             st.error(f"Erro ao carregar eventos: {e}")
+    
+    # ========================================
+    # TAB 3: GALERIA
+    # ========================================
+    with t3:
+        st.subheader("🖼️ Galeria de Eventos")
+        
+        try:
+            eventos_gal = base.list_rows("Eventos")
+            eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
+            
+            if not eventos_com_cartaz:
+                st.info("📭 Nenhum cartaz disponível no momento")
+            else:
+                cols = st.columns(3)
+                for i, ev in enumerate(eventos_com_cartaz):
+                    with cols[i % 3]:
+                        st.image(
+                            ev['Cartaz'],
+                            caption=ev.get('Nome do Evento', 'Evento'),
+                            use_column_width=True
+                        )
+                        st.caption(formatar_data_pt(ev.get('Data')))
+        
+        except Exception as e:
+            st.error(f"Erro ao carregar galeria: {e}")
