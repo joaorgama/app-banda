@@ -9,7 +9,13 @@ def render(base, user):
     """Renderiza interface do maestro"""
     st.title("🎼 Painel do Maestro")
     
-    t1, t2, t3 = st.tabs(["🎼 Reportório", "📅 Agenda de Eventos", "🖼️ Galeria"])
+    # Tabs com Mensagens adicionada
+    t1, t2, t3, t4 = st.tabs([
+        "🎼 Reportório",
+        "📅 Agenda de Eventos",
+        "🖼️ Galeria",
+        "💬 Mensagens"
+    ])
     
     # ========================================
     # TAB 1: GESTÃO DE REPORTÓRIO
@@ -169,3 +175,10 @@ def render(base, user):
         
         except Exception as e:
             st.error(f"Erro ao carregar galeria: {e}")
+    
+    # ========================================
+    # TAB 4: MENSAGENS
+    # ========================================
+    with t4:
+        from mensagens import render_chat
+        render_chat(base, user, pode_apagar=False)
