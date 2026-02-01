@@ -11,13 +11,14 @@ def render(base, user):
     """Renderiza interface do músico"""
     st.title("👤 Portal do Músico")
     
-    # Criar tabs
-    t1, t2, t3, t4, t5 = st.tabs([
+    # Criar tabs (adicionada tab Mensagens)
+    t1, t2, t3, t4, t5, t6 = st.tabs([
         "📅 Agenda",
         "👤 Meus Dados",
         "🎷 Instrumento",
         "🎼 Reportório",
-        "🖼️ Galeria"
+        "🖼️ Galeria",
+        "💬 Mensagens"
     ])
     
     # Carregar dados do músico
@@ -290,3 +291,10 @@ def render(base, user):
         
         except Exception as e:
             st.error(f"Erro ao carregar galeria: {e}")
+    
+    # ========================================
+    # TAB 6: MENSAGENS
+    # ========================================
+    with t6:
+        from mensagens import render_chat
+        render_chat(base, user, pode_apagar=False)
