@@ -2,6 +2,7 @@
 Interface do Músico - Portal BMO
 """
 import streamlit as st
+import time
 from helpers import formatar_data_pt, converter_data_robusta
 from seatable_conn import add_presenca
 from datetime import datetime
@@ -15,7 +16,7 @@ def render(base, user):
         "📅 Agenda",
         "👤 Meus Dados",
         "🎷 Instrumento",
-        "🎼 Repertório",
+        "🎼 Reportório",
         "🖼️ Galeria"
     ])
     
@@ -60,13 +61,13 @@ def render(base, user):
                         
                         with col2:
                             if resp_atual == "Vou":
-                                st.success(f"**Status:** ✅ {resp_atual}")
+                                st.success(f"**Estado:** ✅ {resp_atual}")
                             elif resp_atual == "Não Vou":
-                                st.error(f"**Status:** ❌ {resp_atual}")
+                                st.error(f"**Estado:** ❌ {resp_atual}")
                             elif resp_atual == "Talvez":
-                                st.warning(f"**Status:** ❓ {resp_atual}")
+                                st.warning(f"**Estado:** ❓ {resp_atual}")
                             else:
-                                st.info(f"**Status:** ⏳ {resp_atual}")
+                                st.info(f"**Estado:** ⏳ {resp_atual}")
                         
                         # Mostrar descrição se existir
                         if e.get('Descricao'):
@@ -210,16 +211,16 @@ def render(base, user):
                         st.error(f"Erro: {e}")
     
     # ========================================
-    # TAB 4: REPERTÓRIO
+    # TAB 4: REPORTÓRIO
     # ========================================
     with t4:
-        st.subheader("🎼 Repertório da Banda")
+        st.subheader("🎼 Reportório da Banda")
         
         try:
             repertorio = base.list_rows("Repertorio")
             
             if not repertorio:
-                st.info("📭 Nenhuma obra no repertório atual")
+                st.info("📭 Nenhuma obra no reportório atual")
             else:
                 # Filtro de pesquisa
                 search = st.text_input("🔍 Pesquisar obra ou compositor", "")
@@ -243,7 +244,7 @@ def render(base, user):
                                 st.info("Sem partitura disponível")
         
         except Exception as e:
-            st.error(f"Erro ao carregar repertório: {e}")
+            st.error(f"Erro ao carregar reportório: {e}")
     
     # ========================================
     # TAB 5: GALERIA
