@@ -163,19 +163,24 @@ def render(base, user):
             st.warning("⚠️ Dados não encontrados")
         else:
             with st.form("instrumento"):
+                # Checkbox sem ícone
                 prop = st.checkbox(
-                    "✅ Instrumento Próprio",
+                    "Instrumento Próprio",
                     value=m_row.get('Instrumento Proprio', False),
                     help="Marque se o instrumento é seu (não da banda)"
                 )
                 
+                st.divider()
+                
+                # Campo Instrumento
                 inst = st.text_input(
-                    "Instrumento",
+                    "Instrumento*",
                     value=m_row.get('Instrumento', ''),
-                    help="Ex: Trompete, Trombone, Clarinete"
+                    help="Ex: Trompete, Trombone, Clarinete, Bombardino"
                 )
                 
-                col1, col2 = st.columns(2)
+                # Campos da banda (desativados se for instrumento próprio)
+                col1, col2, col3 = st.columns(3)
                 
                 with col1:
                     marc = st.text_input(
@@ -186,6 +191,14 @@ def render(base, user):
                     )
                 
                 with col2:
+                    modelo = st.text_input(
+                        "Modelo",
+                        value=m_row.get('Modelo', ''),
+                        disabled=prop,
+                        help="Modelo do instrumento da banda"
+                    )
+                
+                with col3:
                     seri = st.text_input(
                         "Nº de Série",
                         value=m_row.get('Num Serie', ''),
@@ -194,21 +207,27 @@ def render(base, user):
                     )
                 
                 if prop:
-                    st.info("ℹ️ Como usa instrumento próprio, não precisa preencher marca/série")
+                    st.info("ℹ️ Como usa instrumento próprio, não precisa preencher marca, modelo e série")
+                else:
+                    st.caption("Preencha os dados do instrumento fornecido pela banda")
                 
                 if st.form_submit_button("💾 Atualizar Instrumento", use_container_width=True):
-                    try:
-                        base.update_row("Musicos", m_row['_id'], {
-                            "Instrumento Proprio": prop,
-                            "Instrumento": inst,
-                            "Marca": marc if not prop else "",
-                            "Num Serie": seri if not prop else ""
-                        })
-                        st.success("✅ Instrumento atualizado!")
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
+                    if not inst:
+                        st.error("⚠️ O campo Instrumento é obrigatório")
+                    else:
+                        try:
+                            base.update_row("Musicos", m_row['_id'], {
+                                "Instrumento Proprio": prop,
+                                "Instrumento": inst,
+                                "Marca": marc if not prop else "",
+                                "Modelo": modelo if not prop else "",
+                                "Num Serie": seri if not prop else ""
+                            })
+                            st.success("✅ Instrumento atualizado!")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
     
     # ========================================
     # TAB 4: REPORTÓRIO
