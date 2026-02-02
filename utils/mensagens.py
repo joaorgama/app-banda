@@ -40,11 +40,11 @@ def listar_mensagens(base):
             hora = msg.get('Hora') or '00:00'
             return (str(data), str(hora))
         
-        # Ordenar por data e hora (mais recentes no topo)
+        # Ordenar por data e hora (mais antigas primeiro, recentes em baixo)
         mensagens_ordenadas = sorted(
             mensagens,
             key=chave_ordenacao,
-            reverse=True
+            reverse=False  # False = antigas primeiro
         )
         return mensagens_ordenadas
     except Exception as e:
@@ -127,10 +127,11 @@ def render_chat(base, user, pode_apagar=False):
                 col_filtro1, col_filtro2 = st.columns([2, 2])
                 with col_filtro1:
                     filtro_autor = st.multiselect(
-                        "Filtrar por autor:",
+                        "Filtrar por autor (deixe vazio para ver todos):",
                         options=autores,
-                        default=autores,
-                        key="filtro_mensagens"
+                        default=[],  # Vazio por default = mostra todos
+                        key="filtro_mensagens",
+                        placeholder="Selecione autores..."
                     )
                 
                 with col_filtro2:
@@ -139,30 +140,33 @@ def render_chat(base, user, pode_apagar=False):
                 
                 st.divider()
                 
-                # Mostrar mensagens
-                mensagens_visiveis = 0
-                for msg in mensagens:
-                    nome = str(msg.get('Nome', 'Desconhecido'))
+                # Container com scroll
+                chat_container = st.container(height=500)  # 500px de altura com scroll
+                
+                with chat_container:
+                    mensagens_visiveis = 0
                     
-                    # Aplicar filtro
-                    if nome not in filtro_autor:
-                        continue
-                    
-                    mensagens_visiveis += 1
-                    
-                    data = msg.get('Data', '')
-                    hora = msg.get('Hora', '')
-                    texto = msg.get('Mensagem', '')
-                    
-                    # Formatação da data
-                    try:
-                        from helpers import formatar_data_pt
-                        data_formatada = formatar_data_pt(data) if data else ''
-                    except:
-                        data_formatada = str(data) if data else ''
-                    
-                    # Card da mensagem
-                    with st.container():
+                    for msg in mensagens:
+                        nome = str(msg.get('Nome', 'Desconhecido'))
+                        
+                        # Aplicar filtro (se vazio, mostra todos)
+                        if filtro_autor and nome not in filtro_autor:
+                            continue
+                        
+                        mensagens_visiveis += 1
+                        
+                        data = msg.get('Data', '')
+                        hora = msg.get('Hora', '')
+                        texto = msg.get('Mensagem', '')
+                        
+                        # Formatação da data
+                        try:
+                            from helpers import formatar_data_pt
+                            data_formatada = formatar_data_pt(data) if data else ''
+                        except:
+                            data_formatada = str(data) if data else ''
+                        
+                        # Card da mensagem
                         col1, col2 = st.columns([5, 1])
                         
                         with col1:
@@ -183,9 +187,9 @@ def render_chat(base, user, pode_apagar=False):
                                         st.error(resultado)
                         
                         st.divider()
-                
-                if mensagens_visiveis == 0:
-                    st.info("Nenhuma mensagem encontrada com os filtros selecionados")
+                    
+                    if mensagens_visiveis == 0:
+                        st.info("Nenhuma mensagem encontrada com os filtros selecionados")
             
             else:
                 st.warning("⚠️ Mensagens sem autor definido")
