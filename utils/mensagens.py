@@ -30,17 +30,23 @@ def listar_mensagens(base):
     """
     try:
         mensagens = base.list_rows("Mensagens")
+        
+        # Debug
         if not mensagens:
             return []
         
-        # Ordenar por data e hora (mais recentes primeiro)
+        # Ordenar por data e hora (mais recentes no topo)
         mensagens_ordenadas = sorted(
             mensagens,
-            key=lambda x: (x.get('Data', ''), x.get('Hora', '')),
+            key=lambda x: (
+                x.get('Data', '1900-01-01'),
+                x.get('Hora', '00:00')
+            ),
             reverse=True
         )
         return mensagens_ordenadas
-    except:
+    except Exception as e:
+        st.error(f"Erro ao carregar mensagens: {e}")
         return []
 
 def apagar_mensagem(base, mensagem_id):
@@ -102,70 +108,85 @@ def render_chat(base, user, pode_apagar=False):
     # ========================================
     # LISTAR MENSAGENS
     # ========================================
-    mensagens = listar_mensagens(base)
     
-    if not mensagens:
-        st.info("📭 Ainda não há mensagens. Seja o primeiro a escrever!")
-    else:
-        st.caption(f"📊 Total de mensagens: {len(mensagens)}")
+    try:
+        mensagens = listar_mensagens(base)
         
-        # Filtro por autor (opcional)
-        autores = sorted(list(set([m.get('Nome', 'Desconhecido') for m in mensagens])))
-        
-        col_filtro1, col_filtro2 = st.columns([2, 2])
-        with col_filtro1:
-            filtro_autor = st.multiselect(
-                "Filtrar por autor:",
-                options=autores,
-                default=autores,
-                key="filtro_mensagens"
-            )
-        
-        with col_filtro2:
-            if pode_apagar:
-                st.caption("⚠️ Pode apagar mensagens")
-        
-        st.divider()
-        
-        # Mostrar mensagens
-        for msg in mensagens:
-            nome = msg.get('Nome', 'Desconhecido')
+        if not mensagens or len(mensagens) == 0:
+            st.info("📭 Ainda não há mensagens. Seja o primeiro a escrever!")
+        else:
+            st.caption(f"📊 Total de mensagens: {len(mensagens)}")
             
-            # Aplicar filtro
-            if nome not in filtro_autor:
-                continue
+            # Filtro por autor (opcional)
+            autores = sorted(list(set([m.get('Nome', 'Desconhecido') for m in mensagens if m.get('Nome')])))
             
-            data = msg.get('Data', '')
-            hora = msg.get('Hora', '')
-            texto = msg.get('Mensagem', '')
-            username = msg.get('Username', '')
-            
-            # Formatação da data
-            try:
-                from helpers import formatar_data_pt
-                data_formatada = formatar_data_pt(data)
-            except:
-                data_formatada = data
-            
-            # Card da mensagem
-            with st.container():
-                col1, col2 = st.columns([5, 1])
+            if autores:
+                col_filtro1, col_filtro2 = st.columns([2, 2])
+                with col_filtro1:
+                    filtro_autor = st.multiselect(
+                        "Filtrar por autor:",
+                        options=autores,
+                        default=autores,
+                        key="filtro_mensagens"
+                    )
                 
-                with col1:
-                    # Cabeçalho
-                    st.markdown(f"**{nome}** · *{data_formatada} às {hora}*")
-                    # Mensagem
-                    st.write(texto)
-                
-                with col2:
-                    # Botão apagar (só para Direção)
+                with col_filtro2:
                     if pode_apagar:
-                        if st.button("🗑️", key=f"del_msg_{msg['_id']}", help="Apagar mensagem"):
-                            sucesso, resultado = apagar_mensagem(base, msg['_id'])
-                            if sucesso:
-                                st.success("Apagada!")
-                                st.rerun()
-                            else:
-                                st.error(resultado)
+                        st.caption("⚠️ Pode apagar mensagens")
                 
                 st.divider()
+                
+                # Mostrar mensagens
+                mensagens_visiveis = 0
+                for msg in mensagens:
+                    nome = msg.get('Nome', 'Desconhecido')
+                    
+                    # Aplicar filtro
+                    if nome not in filtro_autor:
+                        continue
+                    
+                    mensagens_visiveis += 1
+                    
+                    data = msg.get('Data', '')
+                    hora = msg.get('Hora', '')
+                    texto = msg.get('Mensagem', '')
+                    
+                    # Formatação da data
+                    try:
+                        from helpers import formatar_data_pt
+                        data_formatada = formatar_data_pt(data)
+                    except:
+                        data_formatada = data
+                    
+                    # Card da mensagem
+                    with st.container():
+                        col1, col2 = st.columns([5, 1])
+                        
+                        with col1:
+                            # Cabeçalho
+                            st.markdown(f"**{nome}** · *{data_formatada} às {hora}*")
+                            # Mensagem
+                            st.write(texto)
+                        
+                        with col2:
+                            # Botão apagar (só para Direção)
+                            if pode_apagar:
+                                if st.button("🗑️", key=f"del_msg_{msg['_id']}", help="Apagar mensagem"):
+                                    sucesso, resultado = apagar_mensagem(base, msg['_id'])
+                                    if sucesso:
+                                        st.success("Apagada!")
+                                        st.rerun()
+                                    else:
+                                        st.error(resultado)
+                        
+                        st.divider()
+                
+                if mensagens_visiveis == 0:
+                    st.info("Nenhuma mensagem encontrada com os filtros selecionados")
+            
+            else:
+                st.warning("⚠️ Mensagens sem autor definido")
+    
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar chat: {str(e)}")
+        st.exception(e)
