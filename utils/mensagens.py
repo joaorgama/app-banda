@@ -31,17 +31,19 @@ def listar_mensagens(base):
     try:
         mensagens = base.list_rows("Mensagens")
         
-        # Debug
         if not mensagens:
             return []
+        
+        # Função auxiliar para ordenação segura
+        def chave_ordenacao(msg):
+            data = msg.get('Data') or '1900-01-01'
+            hora = msg.get('Hora') or '00:00'
+            return (str(data), str(hora))
         
         # Ordenar por data e hora (mais recentes no topo)
         mensagens_ordenadas = sorted(
             mensagens,
-            key=lambda x: (
-                x.get('Data', '1900-01-01'),
-                x.get('Hora', '00:00')
-            ),
+            key=chave_ordenacao,
             reverse=True
         )
         return mensagens_ordenadas
@@ -118,7 +120,8 @@ def render_chat(base, user, pode_apagar=False):
             st.caption(f"📊 Total de mensagens: {len(mensagens)}")
             
             # Filtro por autor (opcional)
-            autores = sorted(list(set([m.get('Nome', 'Desconhecido') for m in mensagens if m.get('Nome')])))
+            autores_raw = [m.get('Nome') for m in mensagens if m.get('Nome')]
+            autores = sorted(list(set([str(a) for a in autores_raw if a])))
             
             if autores:
                 col_filtro1, col_filtro2 = st.columns([2, 2])
@@ -139,7 +142,7 @@ def render_chat(base, user, pode_apagar=False):
                 # Mostrar mensagens
                 mensagens_visiveis = 0
                 for msg in mensagens:
-                    nome = msg.get('Nome', 'Desconhecido')
+                    nome = str(msg.get('Nome', 'Desconhecido'))
                     
                     # Aplicar filtro
                     if nome not in filtro_autor:
@@ -154,9 +157,9 @@ def render_chat(base, user, pode_apagar=False):
                     # Formatação da data
                     try:
                         from helpers import formatar_data_pt
-                        data_formatada = formatar_data_pt(data)
+                        data_formatada = formatar_data_pt(data) if data else ''
                     except:
-                        data_formatada = data
+                        data_formatada = str(data) if data else ''
                     
                     # Card da mensagem
                     with st.container():
@@ -189,4 +192,5 @@ def render_chat(base, user, pode_apagar=False):
     
     except Exception as e:
         st.error(f"❌ Erro ao carregar chat: {str(e)}")
-        st.exception(e)
+        import traceback
+        st.code(traceback.format_exc())
