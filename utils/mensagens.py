@@ -148,7 +148,7 @@ def render_chat(base, user, pode_apagar=False):
                 for msg in mensagens:
                     nome = str(msg.get('Nome', 'Desconhecido'))
                     
-                    # Lógica do filtro CORRIGIDA:
+                    # Lógica do filtro:
                     # Se filtro_autor está vazio (len==0), mostra TUDO
                     # Se filtro_autor tem itens, só mostra se o nome está na lista
                     if len(filtro_autor) > 0 and nome not in filtro_autor:
@@ -189,8 +189,35 @@ def render_chat(base, user, pode_apagar=False):
                     
                     st.divider()
                 
+                # Marcador invisível no final para scroll automático
+                st.markdown('<div id="chat-end"></div>', unsafe_allow_html=True)
+                
                 if mensagens_visiveis == 0:
                     st.info("Nenhuma mensagem encontrada com os filtros selecionados")
+            
+            # JavaScript para fazer scroll automático para o final
+            st.markdown("""
+                <script>
+                    // Aguardar 100ms para garantir que o DOM está pronto
+                    setTimeout(function() {
+                        // Encontrar todos os elementos com scroll
+                        var containers = parent.document.querySelectorAll('[data-testid="stVerticalBlock"]');
+                        
+                        // Iterar e fazer scroll no container que tem altura definida
+                        containers.forEach(function(container) {
+                            if (container.style.height && container.scrollHeight > container.clientHeight) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        });
+                        
+                        // Método alternativo: scroll para o marcador
+                        var chatEnd = parent.document.getElementById('chat-end');
+                        if (chatEnd) {
+                            chatEnd.scrollIntoView({behavior: 'smooth', block: 'end'});
+                        }
+                    }, 100);
+                </script>
+            """, unsafe_allow_html=True)
     
     except Exception as e:
         st.error(f"❌ Erro ao carregar chat: {str(e)}")
