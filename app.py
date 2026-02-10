@@ -30,6 +30,29 @@ st.set_page_config(
 )
 
 # ============================================
+# CSS CUSTOMIZADO
+# ============================================
+st.markdown("""
+    <style>
+        /* Esconder navegação de páginas do Streamlit */
+        [data-testid="stSidebarNav"] {
+            display: none;
+        }
+        
+        section[data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+        
+        /* CSS da página de login */
+        .login-header {
+            text-align: center;
+            padding: 2rem 0;
+            color: #ff6b35;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# ============================================
 # INICIALIZAR SESSION STATE
 # ============================================
 
@@ -103,17 +126,6 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
 # ============================================
 
 if not st.session_state['auth_status']:
-    # CSS customizado para login
-    st.markdown("""
-        <style>
-        .login-header {
-            text-align: center;
-            padding: 2rem 0;
-            color: #ff6b35;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
     st.markdown('<h1 class="login-header">🎵 Banda Municipal de Oeiras</h1>', unsafe_allow_html=True)
     
     # Centralizar form de login
