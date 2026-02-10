@@ -2,7 +2,7 @@
 Funções auxiliares para a aplicação BMO
 """
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 
 DEFAULT_PASS = "1234"
@@ -56,7 +56,7 @@ def validar_telefone(telefone):
     """Validação básica de telefone português"""
     tel = str(telefone).replace(' ', '').replace('-', '')
     return len(tel) == 9 and tel.isdigit()
-    
+
 def calcular_aniversarios(musicos_list, dias=15):
     """
     Calcula aniversários nos próximos X dias
@@ -68,8 +68,6 @@ def calcular_aniversarios(musicos_list, dias=15):
     Returns:
         lista de dicionários com músicos que fazem anos
     """
-    from datetime import datetime, timedelta
-    
     hoje = datetime.now().date()
     data_limite = hoje + timedelta(days=dias)
     
