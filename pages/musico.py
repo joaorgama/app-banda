@@ -11,7 +11,7 @@ def render(base, user):
     """Renderiza interface do músico"""
     st.title("👤 Portal do Músico")
     
-    # Criar tabs COM ANIVERSÁRIOS
+    # Criar tabs
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
         "📅 Agenda",
         "👤 Meus Dados",
@@ -293,7 +293,7 @@ def render(base, user):
         render_chat(base, user, pode_apagar=False)
     
     # ========================================
-    # TAB 7: ANIVERSÁRIOS (INLINE - SEM IMPORTS)
+    # TAB 7: ANIVERSÁRIOS
     # ========================================
     with t7:
         st.subheader("🎂 Aniversários Próximos")
@@ -301,7 +301,7 @@ def render(base, user):
         if not musicos:
             st.info("📭 Sem dados de músicos")
         else:
-            # Calcular aniversários INLINE
+            # Calcular aniversários
             hoje = datetime.now().date()
             data_limite = hoje + timedelta(days=15)
             aniversarios = []
