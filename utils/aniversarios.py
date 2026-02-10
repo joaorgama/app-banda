@@ -36,15 +36,12 @@ def render_aniversarios(base):
                 if dias == 0:
                     emoji = "🎉"
                     msg_dias = "**HOJE!**"
-                    tipo = "success"
                 elif dias == 1:
                     emoji = "🎂"
                     msg_dias = "**Amanhã**"
-                    tipo = "warning"
                 else:
                     emoji = "🎈"
                     msg_dias = f"Em {dias} dias"
-                    tipo = "info"
                 
                 # Card do aniversário
                 with st.container():
@@ -66,3 +63,4 @@ def render_aniversarios(base):
     
     except Exception as e:
         st.error(f"Erro ao carregar aniversários: {e}")
+        st.exception(e)
