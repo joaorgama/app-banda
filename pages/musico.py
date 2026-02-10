@@ -5,13 +5,13 @@ import streamlit as st
 import time
 from helpers import formatar_data_pt, converter_data_robusta
 from seatable_conn import add_presenca
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def render(base, user):
     """Renderiza interface do músico"""
     st.title("👤 Portal do Músico")
     
-    # Criar tabs (ADICIONADA TAB ANIVERSÁRIOS)
+    # Criar tabs COM ANIVERSÁRIOS
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
         "📅 Agenda",
         "👤 Meus Dados",
@@ -28,6 +28,7 @@ def render(base, user):
         m_row = next((r for r in musicos if str(r.get('Username', '')).lower() == user['username']), None)
     except:
         m_row = None
+        musicos = []
         st.error("❌ Erro ao carregar dados do músico")
     
     # ========================================
@@ -48,7 +49,6 @@ def render(base, user):
                     nome_evento = e.get('Nome do Evento', 'Sem nome')
                     
                     with st.expander(f"📅 {data_evento} - {nome_evento}"):
-                        # Verificar resposta atual
                         resp_atual = next(
                             (p['Resposta'] for p in presencas 
                              if p.get('EventoID') == e['_id'] and p.get('Username') == user['username']),
@@ -71,13 +71,10 @@ def render(base, user):
                             else:
                                 st.info(f"**Estado:** ⏳ {resp_atual}")
                         
-                        # Mostrar descrição se existir
                         if e.get('Descricao'):
                             st.markdown(f"*{e.get('Descricao')}*")
                         
                         st.divider()
-                        
-                        # Botões de resposta
                         st.write("**Confirmar presença:**")
                         c1, c2, c3 = st.columns(3)
                         
@@ -165,7 +162,6 @@ def render(base, user):
             st.warning("⚠️ Dados não encontrados")
         else:
             with st.form("instrumento"):
-                # Checkbox sem ícone
                 prop = st.checkbox(
                     "Instrumento Próprio",
                     value=m_row.get('Instrumento Proprio', False),
@@ -174,14 +170,12 @@ def render(base, user):
                 
                 st.divider()
                 
-                # Campo Instrumento
                 inst = st.text_input(
                     "Instrumento*",
                     value=m_row.get('Instrumento', ''),
                     help="Ex: Trompete, Trombone, Clarinete, Bombardino"
                 )
                 
-                # Campos da banda (desativados se for instrumento próprio)
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
@@ -243,14 +237,12 @@ def render(base, user):
             if not repertorio:
                 st.info("📭 Nenhuma obra no reportório atual")
             else:
-                # Filtro de pesquisa
                 search = st.text_input("🔍 Pesquisar obra ou compositor", "")
                 
                 for r in repertorio:
                     nome_obra = r.get('Nome da Obra', 'S/ Nome')
                     compositor = r.get('Compositor', '---')
                     
-                    # Aplicar filtro
                     if search.lower() in nome_obra.lower() or search.lower() in compositor.lower() or not search:
                         with st.expander(f"🎼 {nome_obra}"):
                             st.write(f"**Compositor:** {compositor}")
@@ -301,8 +293,77 @@ def render(base, user):
         render_chat(base, user, pode_apagar=False)
     
     # ========================================
-    # TAB 7: ANIVERSÁRIOS
+    # TAB 7: ANIVERSÁRIOS (INLINE - SEM IMPORTS)
     # ========================================
     with t7:
-        from aniversarios import render_aniversarios
-        render_aniversarios(base)
+        st.subheader("🎂 Aniversários Próximos")
+        
+        if not musicos:
+            st.info("📭 Sem dados de músicos")
+        else:
+            # Calcular aniversários INLINE
+            hoje = datetime.now().date()
+            data_limite = hoje + timedelta(days=15)
+            aniversarios = []
+            
+            for m in musicos:
+                data_nasc = converter_data_robusta(m.get('Data de Nascimento'))
+                
+                if not data_nasc:
+                    continue
+                
+                try:
+                    aniversario_este_ano = data_nasc.replace(year=hoje.year)
+                except ValueError:
+                    aniversario_este_ano = data_nasc.replace(year=hoje.year, day=28)
+                
+                if aniversario_este_ano < hoje:
+                    try:
+                        aniversario_este_ano = data_nasc.replace(year=hoje.year + 1)
+                    except ValueError:
+                        aniversario_este_ano = data_nasc.replace(year=hoje.year + 1, day=28)
+                
+                if hoje <= aniversario_este_ano <= data_limite:
+                    dias_faltam = (aniversario_este_ano - hoje).days
+                    idade = hoje.year - data_nasc.year
+                    
+                    aniversarios.append({
+                        'nome': m.get('Nome', 'Desconhecido'),
+                        'data_aniversario': aniversario_este_ano,
+                        'dias_faltam': dias_faltam,
+                        'idade': idade,
+                        'instrumento': m.get('Instrumento', 'N/D')
+                    })
+            
+            aniversarios.sort(key=lambda x: x['dias_faltam'])
+            
+            if not aniversarios:
+                st.info("🎈 Não há aniversários nos próximos 15 dias")
+            else:
+                st.caption(f"📊 {len(aniversarios)} aniversário(s) nos próximos 15 dias")
+                
+                for aniv in aniversarios:
+                    dias = aniv['dias_faltam']
+                    
+                    if dias == 0:
+                        emoji, msg = "🎉", "**HOJE!**"
+                    elif dias == 1:
+                        emoji, msg = "🎂", "**Amanhã**"
+                    else:
+                        emoji, msg = "🎈", f"Em {dias} dias"
+                    
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        st.markdown(f"{emoji} **{aniv['nome']}** {msg}")
+                        st.caption(f"📅 {formatar_data_pt(str(aniv['data_aniversario']))} • {aniv['idade']} anos • 🎷 {aniv['instrumento']}")
+                    
+                    with col2:
+                        if dias == 0:
+                            st.success("HOJE")
+                        elif dias <= 3:
+                            st.warning(f"{dias}d")
+                        else:
+                            st.info(f"{dias}d")
+                    
+                    st.divider()
