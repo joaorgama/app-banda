@@ -10,6 +10,14 @@ from datetime import datetime
 def render(base, user):
     """Renderiza interface do músico"""
     st.title("👤 Portal do Músico")
+
+    # ========================================
+    # ANIVERSÁRIOS NA SIDEBAR
+    # ========================================
+    with st.sidebar:
+        st.divider()
+        from aniversarios import render_aniversarios
+        render_aniversarios(base)
     
     # Criar tabs (adicionada tab Mensagens)
     t1, t2, t3, t4, t5, t6 = st.tabs([
