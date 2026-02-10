@@ -10,23 +10,16 @@ from datetime import datetime
 def render(base, user):
     """Renderiza interface do músico"""
     st.title("👤 Portal do Músico")
-
-    # ========================================
-    # ANIVERSÁRIOS NA SIDEBAR
-    # ========================================
-    with st.sidebar:
-        st.divider()
-        from aniversarios import render_aniversarios
-        render_aniversarios(base)
     
-    # Criar tabs (adicionada tab Mensagens)
-    t1, t2, t3, t4, t5, t6 = st.tabs([
+    # Criar tabs (ADICIONADA TAB ANIVERSÁRIOS)
+    t1, t2, t3, t4, t5, t6, t7 = st.tabs([
         "📅 Agenda",
         "👤 Meus Dados",
         "🎷 Instrumento",
         "🎼 Reportório",
         "🖼️ Galeria",
-        "💬 Mensagens"
+        "💬 Mensagens",
+        "🎂 Aniversários"
     ])
     
     # Carregar dados do músico
@@ -306,3 +299,10 @@ def render(base, user):
     with t6:
         from mensagens import render_chat
         render_chat(base, user, pode_apagar=False)
+    
+    # ========================================
+    # TAB 7: ANIVERSÁRIOS
+    # ========================================
+    with t7:
+        from aniversarios import render_aniversarios
+        render_aniversarios(base)
