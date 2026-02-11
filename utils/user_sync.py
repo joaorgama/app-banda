@@ -1,19 +1,24 @@
 """
 Sincronização de utilizadores - Portal BMO
 """
-import bcrypt
 from unidecode import unidecode
 
 def gerar_username(nome):
     """Gera username a partir do nome completo"""
-    if not nome:
+    if not nome or str(nome).strip() == '' or str(nome).lower() == 'none':
         return None
     
     # Remover acentos e converter para minúsculas
-    nome_limpo = unidecode(str(nome)).lower()
+    nome_limpo = unidecode(str(nome)).lower().strip()
+    
+    if not nome_limpo or nome_limpo == 'none':
+        return None
     
     # Dividir nome
     partes = nome_limpo.split()
+    
+    # Remover partes vazias
+    partes = [p for p in partes if p and p != 'none']
     
     if len(partes) == 0:
         return None
@@ -40,7 +45,7 @@ def limpar_duplicados_utilizadores(base):
         for u in utilizadores:
             username = str(u.get('Username', '')).lower().strip()
             
-            if not username:
+            if not username or username == 'none':
                 continue
             
             if username not in usuarios_por_username:
@@ -80,7 +85,7 @@ def limpar_duplicados_utilizadores(base):
 def sincronizar_novos_utilizadores(base):
     """
     Cria utilizadores para músicos que ainda não têm conta
-    Password padrão: 1234 (será encriptada)
+    Password padrão: "1234" (em texto simples, será encriptada no primeiro login)
     """
     try:
         musicos = base.list_rows("Musicos")
@@ -93,7 +98,7 @@ def sincronizar_novos_utilizadores(base):
         usernames_existentes = set()
         for u in utilizadores:
             username = str(u.get('Username', '')).lower().strip()
-            if username:
+            if username and username != 'none':
                 usernames_existentes.add(username)
         
         # Verificar músicos sem conta
@@ -104,14 +109,20 @@ def sincronizar_novos_utilizadores(base):
             nome = m.get('Nome', '')
             username_musico = str(m.get('Username', '')).lower().strip()
             
-            # Se músico já tem username definido, usar esse
-            if username_musico:
+            # Ignorar se nome for inválido
+            if not nome or str(nome).strip() == '' or str(nome).lower() == 'none':
+                continue
+            
+            # Se músico já tem username definido e válido, usar esse
+            if username_musico and username_musico != 'none':
                 username = username_musico
             else:
                 # Gerar username a partir do nome
                 username = gerar_username(nome)
             
-            if not username:
+            # Se não conseguiu gerar username válido, skip
+            if not username or username == 'none':
+                erros.append(f"{nome}: Nome inválido para gerar username")
                 continue
             
             # Se já existe, skip
@@ -120,18 +131,17 @@ def sincronizar_novos_utilizadores(base):
             
             # Criar novo utilizador
             try:
-                # Password padrão: 1234 (encriptada)
-                password_hash = bcrypt.hashpw("1234".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                
+                # Password padrão: "1234" EM TEXTO SIMPLES
+                # Será encriptada no primeiro login
                 base.append_row("Utilizadores", {
                     "Nome": nome,
                     "Username": username,
-                    "Password": password_hash,
+                    "Password": "1234",  # TEXTO SIMPLES
                     "Funcao": "Musico"
                 })
                 
                 # Atualizar username no músico se não tinha
-                if not username_musico:
+                if not username_musico or username_musico == 'none':
                     base.update_row("Musicos", m['_id'], {"Username": username})
                 
                 criados += 1
