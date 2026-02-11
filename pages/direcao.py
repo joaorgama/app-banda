@@ -10,14 +10,15 @@ def render(base, user):
     """Renderiza interface da direção"""
     st.title("📊 Painel da Direção")
     
-    # Tabs COM ANIVERSÁRIOS
-    t1, t2, t3, t4, t5, t6 = st.tabs([
+    # Tabs COM GESTÃO DE UTILIZADORES
+    t1, t2, t3, t4, t5, t6, t7 = st.tabs([
         "📅 Eventos",
         "🎷 Inventário",
         "🏫 Escola",
         "📊 Status Geral",
         "💬 Mensagens",
-        "🎂 Aniversários"
+        "🎂 Aniversários",
+        "👥 Utilizadores"
     ])
     
     # ========================================
@@ -486,4 +487,122 @@ def render(base, user):
         
         except Exception as e:
             st.error(f"Erro ao carregar aniversários: {e}")
-            st.exception(e)
+    
+    # ========================================
+    # TAB 7: GESTÃO DE UTILIZADORES
+    # ========================================
+    with t7:
+        st.subheader("👥 Gestão de Utilizadores")
+        
+        st.info("🔧 Ferramentas para manter a tabela de utilizadores sincronizada e limpa")
+        
+        col1, col2 = st.columns(2)
+        
+        # ========================================
+        # COLUNA 1: LIMPAR DUPLICADOS
+        # ========================================
+        with col1:
+            st.markdown("### 🧹 Limpar Duplicados")
+            st.write("Remove utilizadores duplicados, mantendo a versão com password encriptada.")
+            
+            if st.button("🧹 Limpar Duplicados", type="primary", use_container_width=True):
+                with st.spinner("A remover duplicados..."):
+                    from user_sync import limpar_duplicados_utilizadores
+                    resultado = limpar_duplicados_utilizadores(base)
+                    
+                    if resultado["erro"]:
+                        st.error(f"❌ Erro: {resultado['erro']}")
+                    else:
+                        if resultado["removidos"] > 0:
+                            st.success(f"✅ {resultado['removidos']} utilizador(es) duplicado(s) removido(s)!")
+                            st.rerun()
+                        else:
+                            st.info("✨ Nenhum duplicado encontrado!")
+        
+        # ========================================
+        # COLUNA 2: SINCRONIZAR NOVOS
+        # ========================================
+        with col2:
+            st.markdown("### 🔄 Sincronizar Músicos")
+            st.write("Cria utilizadores para músicos que ainda não têm conta (password: 1234).")
+            
+            if st.button("🔄 Sincronizar Músicos", type="secondary", use_container_width=True):
+                with st.spinner("A criar novos utilizadores..."):
+                    from user_sync import sincronizar_novos_utilizadores
+                    resultado = sincronizar_novos_utilizadores(base)
+                    
+                    if resultado["erro"]:
+                        st.warning(f"⚠️ {resultado['criados']} criado(s). Erros: {resultado['erro']}")
+                    else:
+                        if resultado["criados"] > 0:
+                            st.success(f"✅ {resultado['criados']} novo(s) utilizador(es) criado(s)!")
+                            st.rerun()
+                        else:
+                            st.info("✨ Todos os músicos já têm conta!")
+        
+        st.divider()
+        
+        # ========================================
+        # TABELA DE UTILIZADORES
+        # ========================================
+        st.markdown("### 📋 Lista de Utilizadores")
+        
+        try:
+            utilizadores = base.list_rows("Utilizadores")
+            
+            if not utilizadores:
+                st.info("📭 Nenhum utilizador registado")
+            else:
+                # Criar DataFrame
+                users_list = []
+                for u in utilizadores:
+                    password = str(u.get('Password', ''))
+                    
+                    # Verificar se password está encriptada
+                    if password.startswith('$2b$'):
+                        status_pass = "🔒 Encriptada"
+                    elif password == "1234":
+                        status_pass = "⚠️ Padrão (1234)"
+                    else:
+                        status_pass = "❓ Desconhecida"
+                    
+                    users_list.append({
+                        "Nome": u.get('Nome', '---'),
+                        "Username": u.get('Username', '---'),
+                        "Função": u.get('Funcao', '---'),
+                        "Password": status_pass
+                    })
+                
+                df_users = pd.DataFrame(users_list)
+                
+                # Métricas
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total", len(users_list))
+                
+                encriptadas = len([u for u in users_list if u["Password"] == "🔒 Encriptada"])
+                col2.metric("🔒 Encriptadas", encriptadas)
+                
+                padrao = len([u for u in users_list if u["Password"] == "⚠️ Padrão (1234)"])
+                col3.metric("⚠️ Padrão", padrao)
+                
+                st.divider()
+                
+                # Tabela
+                st.dataframe(
+                    df_users,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Nome": st.column_config.TextColumn("👤 Nome", width="large"),
+                        "Username": st.column_config.TextColumn("🔑 Username", width="medium"),
+                        "Função": st.column_config.TextColumn("🎭 Função", width="small"),
+                        "Password": st.column_config.TextColumn("🔐 Password", width="medium")
+                    }
+                )
+                
+                # Alerta de passwords padrão
+                if padrao > 0:
+                    st.warning(f"⚠️ **Atenção:** {padrao} utilizador(es) ainda têm password padrão (1234). Peça-lhes para alterarem!")
+        
+        except Exception as e:
+            st.error(f"Erro ao carregar utilizadores: {e}")
