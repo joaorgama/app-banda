@@ -36,7 +36,7 @@ st.set_page_config(
 )
 
 # ============================================
-# CSS CUSTOMIZADO (COM PROTEÇÃO CONTRA BOTÃO GITHUB)
+# CSS CUSTOMIZADO (COM PROTEÇÃO TOTAL)
 # ============================================
 st.markdown("""
     <style>
@@ -61,6 +61,22 @@ st.markdown("""
         /* Esconder toolbar do GitHub */
         div[data-testid="stToolbar"] {display: none;}
         
+        /* ESCONDER BOTÃO "MANAGE APP" NO CANTO INFERIOR DIREITO */
+        .stAppDeployButton {display: none !important;}
+        div[data-testid="stStatusWidget"] {display: none !important;}
+        button[data-testid="baseButton-header"] {display: none !important;}
+        section[data-testid="stSidebar"] button[kind="header"] {display: none !important;}
+        div[data-testid="stDecoration"] {display: none !important;}
+        
+        /* Esconder status bar e elementos flutuantes */
+        div[data-testid="stBottom"] {display: none !important;}
+        .element-container:has(iframe[title="streamlit_app"]) {display: none !important;}
+        
+        /* Esconder ícone de status/conexão */
+        div[class*="viewerBadge"] {display: none !important;}
+        .viewerBadge_container__1QSob {display: none !important;}
+        .styles_viewerBadge__1yB5_ {display: none !important;}
+        
         /* CSS da página de login */
         .login-header {
             text-align: center;
@@ -69,6 +85,7 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
 
 # ============================================
 # INICIALIZAR SESSION STATE
