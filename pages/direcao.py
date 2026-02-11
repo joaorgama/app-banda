@@ -603,6 +603,42 @@ def render(base, user):
                 # Alerta de passwords padrão
                 if padrao > 0:
                     st.warning(f"⚠️ **Atenção:** {padrao} utilizador(es) ainda têm password padrão (1234). Peça-lhes para alterarem!")
+                
+                # ========================================
+                # RESETAR PASSWORD (NOVO)
+                # ========================================
+                st.divider()
+                st.markdown("### 🔄 Resetar Password de Utilizador")
+                st.caption("Útil quando alguém esquece a password. A nova password será '1234' e o utilizador será obrigado a mudá-la no próximo login.")
+                
+                col_reset1, col_reset2 = st.columns([3, 1])
+                
+                with col_reset1:
+                    # Lista de utilizadores para selecionar
+                    users_nomes = [f"{u.get('Nome')} ({u.get('Username')})" for u in utilizadores]
+                    user_selecionado = st.selectbox(
+                        "Selecione o utilizador:",
+                        options=range(len(utilizadores)),
+                        format_func=lambda i: users_nomes[i],
+                        key="select_reset_user"
+                    )
+                
+                with col_reset2:
+                    if st.button("🔄 Resetar para 1234", type="secondary", use_container_width=True):
+                        try:
+                            user_row = utilizadores[user_selecionado]
+                            
+                            # Resetar password para "1234" (texto simples)
+                            base.update_row("Utilizadores", user_row['_id'], {
+                                "Password": "1234"
+                            })
+                            
+                            st.success(f"✅ Password de **{user_row.get('Nome')}** resetada para '1234'!")
+                            st.info("💡 O utilizador será obrigado a mudar a password no próximo login.")
+                            st.rerun()
+                        
+                        except Exception as e_reset:
+                            st.error(f"❌ Erro ao resetar password: {e_reset}")
         
         except Exception as e:
             st.error(f"Erro ao carregar utilizadores: {e}")
