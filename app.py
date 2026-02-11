@@ -27,11 +27,16 @@ st.set_page_config(
     page_title="BMO Portal",
     page_icon="🎵",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': None,
+        'Report a bug': None,
+        'About': None
+    }
 )
 
 # ============================================
-# CSS CUSTOMIZADO
+# CSS CUSTOMIZADO (COM PROTEÇÃO CONTRA BOTÃO GITHUB)
 # ============================================
 st.markdown("""
     <style>
@@ -43,6 +48,18 @@ st.markdown("""
         section[data-testid="stSidebarNav"] {
             display: none !important;
         }
+        
+        /* Esconder menu principal, footer e botões indesejados */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header[data-testid="stHeader"] {visibility: hidden;}
+        
+        /* Esconder botão Deploy e GitHub */
+        .stDeployButton {display: none;}
+        button[kind="header"] {display: none;}
+        
+        /* Esconder toolbar do GitHub */
+        div[data-testid="stToolbar"] {display: none;}
         
         /* CSS da página de login */
         .login-header {
@@ -117,7 +134,6 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
                     
                     st.session_state['must_change_pass'] = False
                     st.success("✅ Password alterada com sucesso!")
-                    st.balloons()
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Erro ao alterar password: {e}")
