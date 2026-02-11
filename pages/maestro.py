@@ -20,10 +20,59 @@ def render(base, user):
     ])
     
     # ========================================
-    # TAB 1: GESTÃO DE REPORTÓRIO
+    # TAB 1: GESTÃO DE REPORTÓRIO (COM TUTORIAL)
     # ========================================
     with t1:
         st.subheader("🎵 Reportório da Banda")
+        
+        # ========================================
+        # TUTORIAL PARA O MAESTRO
+        # ========================================
+        with st.expander("❓ Como adicionar links (YouTube, Partituras PDF)", expanded=False):
+            st.markdown("""
+            ### 📚 Tutorial Rápido - Como Adicionar Links
+            
+            #### 🎥 **Para adicionar vídeo do YouTube:**
+            
+            1. **Abra o YouTube** no seu navegador
+            2. **Procure** pela música que quer adicionar
+            3. **Clique** no vídeo para abrir
+            4. Na barra de endereço no topo, **copie o link completo**
+               - Exemplo: `https://www.youtube.com/watch?v=abc123`
+            5. **Cole** esse link no campo "Link" ao adicionar a obra
+            
+            ---
+            
+            #### 📄 **Para adicionar partitura em PDF:**
+            
+            **Opção 1 - Se o PDF está na internet:**
+            1. **Abra** a página onde está o PDF
+            2. **Clique com o botão direito** no link do PDF
+            3. Escolha **"Copiar endereço do link"** ou **"Copiar URL"**
+            4. **Cole** no campo "Link"
+            
+            **Opção 2 - Se o PDF está no seu computador:**
+            1. **Carregue** o PDF para o Google Drive ou Dropbox
+            2. **Clique com botão direito** no ficheiro
+            3. Escolha **"Obter link"** ou **"Partilhar"**
+            4. **Ative** a opção "Qualquer pessoa com o link pode ver"
+            5. **Copie** o link e **cole** no campo "Link"
+            
+            ---
+            
+            #### 💡 **Dicas úteis:**
+            
+            - ✅ Pode adicionar **vários links** separados por vírgula
+            - ✅ Exemplo: `https://youtube.com/..., https://drive.google.com/...`
+            - ✅ Os músicos vão ver estes links e podem clicar neles
+            - ✅ Se não tiver link, pode deixar o campo vazio e preencher depois
+            
+            ---
+            
+            #### 🆘 **Precisa de ajuda?**
+            
+            Se tiver dificuldades, peça ajuda a um músico mais jovem ou contacte a direção! 😊
+            """)
         
         # Adicionar nova obra
         with st.expander("➕ Adicionar Nova Obra", expanded=False):
@@ -41,7 +90,7 @@ def render(base, user):
                 link = st.text_input(
                     "Link (YouTube ou Partitura)",
                     placeholder="https://...",
-                    help="Cole o link do YouTube ou da partitura em PDF"
+                    help="Cole aqui o link do YouTube ou da partitura em PDF. Veja o tutorial acima se tiver dúvidas!"
                 )
                 
                 col1, col2 = st.columns([3, 1])
@@ -87,7 +136,18 @@ def render(base, user):
                         with col1:
                             st.write(f"🎵 **{nome}** - *{comp}*")
                             if r.get('Links'):
-                                st.caption(f"🔗 {r.get('Links')}")
+                                # Suportar múltiplos links separados por vírgula
+                                links = str(r.get('Links')).split(',')
+                                for link in links:
+                                    link = link.strip()
+                                    if link:
+                                        # Identificar tipo de link e criar botão clicável
+                                        if 'youtube' in link.lower() or 'youtu.be' in link.lower():
+                                            st.caption(f"🎥 [Ver no YouTube]({link})")
+                                        elif '.pdf' in link.lower() or 'drive.google' in link.lower() or 'dropbox' in link.lower():
+                                            st.caption(f"📄 [Abrir Partitura]({link})")
+                                        else:
+                                            st.caption(f"🔗 [Abrir Link]({link})")
                         
                         with col2:
                             if st.button("🗑️", key=f"del_rep_{r['_id']}", help="Remover obra"):
