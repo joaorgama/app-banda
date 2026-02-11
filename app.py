@@ -295,7 +295,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<p style='text-align: center; color: gray; font-size: 0.8rem;'>"
-    "© 2026 Banda Municipal de Oeiras | Desenvolvido com ❤️ e Streamlit"
+    "© 2026 Banda Municipal de Oeiras | Desenvolvido com ❤️ e 🎵"
     "</p>",
     unsafe_allow_html=True
 )
