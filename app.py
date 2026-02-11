@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+import bcrypt  # IMPORTANTE: adicionar este import
 
 # Adicionar pastas ao path do Python
 current_dir = Path(__file__).parent
@@ -108,7 +109,7 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
             else:
                 try:
                     # Atualizar password na base de dados (ENCRIPTADA)
-                    nova_password_hash = hash_password(new_pass)
+                    nova_password_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                     
                     base.update_row("Utilizadores", user['row_id'], {
                         "Password": nova_password_hash
@@ -181,16 +182,19 @@ if not st.session_state['auth_status']:
                                         password_correta = True
                                         precisa_trocar = True
                                 
-                                # Caso 2: Password em texto simples (não recomendado, mas aceita)
-                                elif not stored_pass.startswith('$2b$'):
-                                    if p_in == stored_pass:
-                                        password_correta = True
-                                        # Se não for 1234, não força troca
-                                        precisa_trocar = False
+                                # Caso 2: Password encriptada com bcrypt (começa com $2b$)
+                                elif stored_pass.startswith('$2b$'):
+                                    try:
+                                        # USAR bcrypt.checkpw() para verificar
+                                        if bcrypt.checkpw(p_in.encode('utf-8'), stored_pass.encode('utf-8')):
+                                            password_correta = True
+                                            precisa_trocar = False
+                                    except Exception:
+                                        password_correta = False
                                 
-                                # Caso 3: Password encriptada (bcrypt)
+                                # Caso 3: Password em texto simples (não recomendado)
                                 else:
-                                    if hash_password(p_in) == stored_pass:
+                                    if p_in == stored_pass:
                                         password_correta = True
                                         precisa_trocar = False
                                 
@@ -291,7 +295,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<p style='text-align: center; color: gray; font-size: 0.8rem;'>"
-    "© 2026 Banda Municipal de Oeiras"
+    "© 2026 Banda Municipal de Oeiras | Desenvolvido com ❤️ e Streamlit"
     "</p>",
     unsafe_allow_html=True
 )
