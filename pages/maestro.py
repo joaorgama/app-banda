@@ -3,18 +3,20 @@ Interface do Maestro - Portal BMO
 """
 import streamlit as st
 import pandas as pd
-from helpers import formatar_data_pt
+from helpers import formatar_data_pt, converter_data_robusta
+from datetime import datetime, timedelta
 
 def render(base, user):
     """Renderiza interface do maestro"""
     st.title("🎼 Painel do Maestro")
     
-    # Tabs com Mensagens adicionada
-    t1, t2, t3, t4 = st.tabs([
+    # Tabs COM ANIVERSÁRIOS
+    t1, t2, t3, t4, t5 = st.tabs([
         "🎼 Reportório",
         "📅 Agenda de Eventos",
         "🖼️ Galeria",
-        "💬 Mensagens"
+        "💬 Mensagens",
+        "🎂 Aniversários"
     ])
     
     # ========================================
@@ -56,7 +58,6 @@ def render(base, user):
                                     "Links": link
                                 })
                                 st.success(f"✅ Obra **{nome_obra}** adicionada!")
-                                st.balloons()
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Erro: {e}")
@@ -137,7 +138,7 @@ def render(base, user):
                         
                         if presencas_evento:
                             vao = len([p for p in presencas_evento if p.get('Resposta') == 'Vou'])
-                            nao_vao = len([p for p in presencas_evento if p.get('Resposta') == 'Não Vou'])
+                            nao_vao = len([p for p in presencas_evento if p.get('Resposta') == 'Não Vão'])
                             talvez = len([p for p in presencas_evento if p.get('Resposta') == 'Talvez'])
                             
                             c1, c2, c3 = st.columns(3)
@@ -182,3 +183,86 @@ def render(base, user):
     with t4:
         from mensagens import render_chat
         render_chat(base, user, pode_apagar=False)
+    
+    # ========================================
+    # TAB 5: ANIVERSÁRIOS
+    # ========================================
+    with t5:
+        st.subheader("🎂 Aniversários Próximos")
+        
+        try:
+            musicos = base.list_rows("Musicos")
+            
+            if not musicos:
+                st.info("📭 Sem dados de músicos")
+            else:
+                # Calcular aniversários
+                hoje = datetime.now().date()
+                data_limite = hoje + timedelta(days=15)
+                aniversarios = []
+                
+                for m in musicos:
+                    data_nasc = converter_data_robusta(m.get('Data de Nascimento'))
+                    
+                    if not data_nasc:
+                        continue
+                    
+                    try:
+                        aniversario_este_ano = data_nasc.replace(year=hoje.year)
+                    except ValueError:
+                        aniversario_este_ano = data_nasc.replace(year=hoje.year, day=28)
+                    
+                    if aniversario_este_ano < hoje:
+                        try:
+                            aniversario_este_ano = data_nasc.replace(year=hoje.year + 1)
+                        except ValueError:
+                            aniversario_este_ano = data_nasc.replace(year=hoje.year + 1, day=28)
+                    
+                    if hoje <= aniversario_este_ano <= data_limite:
+                        dias_faltam = (aniversario_este_ano - hoje).days
+                        idade = hoje.year - data_nasc.year
+                        
+                        aniversarios.append({
+                            'nome': m.get('Nome', 'Desconhecido'),
+                            'data_aniversario': aniversario_este_ano,
+                            'dias_faltam': dias_faltam,
+                            'idade': idade,
+                            'instrumento': m.get('Instrumento', 'N/D')
+                        })
+                
+                aniversarios.sort(key=lambda x: x['dias_faltam'])
+                
+                if not aniversarios:
+                    st.info("🎈 Não há aniversários nos próximos 15 dias")
+                else:
+                    st.caption(f"📊 {len(aniversarios)} aniversário(s) nos próximos 15 dias")
+                    
+                    for aniv in aniversarios:
+                        dias = aniv['dias_faltam']
+                        
+                        if dias == 0:
+                            emoji, msg = "🎉", "**HOJE!**"
+                        elif dias == 1:
+                            emoji, msg = "🎂", "**Amanhã**"
+                        else:
+                            emoji, msg = "🎈", f"Em {dias} dias"
+                        
+                        col1, col2 = st.columns([4, 1])
+                        
+                        with col1:
+                            st.markdown(f"{emoji} **{aniv['nome']}** {msg}")
+                            st.caption(f"📅 {formatar_data_pt(str(aniv['data_aniversario']))} • {aniv['idade']} anos • 🎷 {aniv['instrumento']}")
+                        
+                        with col2:
+                            if dias == 0:
+                                st.success("HOJE")
+                            elif dias <= 3:
+                                st.warning(f"{dias}d")
+                            else:
+                                st.info(f"{dias}d")
+                        
+                        st.divider()
+        
+        except Exception as e:
+            st.error(f"Erro ao carregar aniversários: {e}")
+            st.exception(e)
