@@ -103,13 +103,15 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
                 st.error("❌ A password deve ter pelo menos 4 caracteres")
             elif new_pass != confirm_pass:
                 st.error("❌ As passwords não coincidem")
-            elif new_pass == DEFAULT_PASS:
+            elif new_pass == DEFAULT_PASS or new_pass == "1234":
                 st.error("❌ Não pode usar a password padrão '1234'")
             else:
                 try:
-                    # Atualizar password na base de dados (com hash)
+                    # Atualizar password na base de dados (ENCRIPTADA)
+                    nova_password_hash = hash_password(new_pass)
+                    
                     base.update_row("Utilizadores", user['row_id'], {
-                        "Password": hash_password(new_pass)
+                        "Password": nova_password_hash
                     })
                     
                     st.session_state['must_change_pass'] = False
@@ -167,14 +169,36 @@ if not st.session_state['auth_status']:
                                 st.error("❌ Utilizador não encontrado")
                             else:
                                 row = match.iloc[0]
-                                stored_pass = str(row.get('Password', DEFAULT_PASS))
+                                stored_pass = str(row.get('Password', ''))
                                 
-                                # Verificar password (aceita plain text ou hash)
-                                if (p_in == stored_pass) or (hash_password(p_in) == stored_pass):
+                                # Verificar se password é válida
+                                password_correta = False
+                                precisa_trocar = False
+                                
+                                # Caso 1: Password padrão "1234" (texto simples)
+                                if stored_pass == "1234":
+                                    if p_in == "1234":
+                                        password_correta = True
+                                        precisa_trocar = True
+                                
+                                # Caso 2: Password em texto simples (não recomendado, mas aceita)
+                                elif not stored_pass.startswith('$2b$'):
+                                    if p_in == stored_pass:
+                                        password_correta = True
+                                        # Se não for 1234, não força troca
+                                        precisa_trocar = False
+                                
+                                # Caso 3: Password encriptada (bcrypt)
+                                else:
+                                    if hash_password(p_in) == stored_pass:
+                                        password_correta = True
+                                        precisa_trocar = False
+                                
+                                if password_correta:
                                     # Login bem-sucedido
                                     st.session_state.update({
                                         'auth_status': True,
-                                        'must_change_pass': (stored_pass == DEFAULT_PASS),
+                                        'must_change_pass': precisa_trocar,
                                         'user_info': {
                                             'username': u_in,
                                             'display_name': row.get('Nome', u_in),
@@ -267,7 +291,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<p style='text-align: center; color: gray; font-size: 0.8rem;'>"
-    "© 2026 Banda Municipal de Oeiras | Desenvolvido com ❤️ e Streamlit"
+    "© 2026 Banda Municipal de Oeiras"
     "</p>",
     unsafe_allow_html=True
 )
