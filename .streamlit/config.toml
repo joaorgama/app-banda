@@ -3,7 +3,11 @@ toolbarMode = "minimal"
 showErrorDetails = false
 
 [ui]
-hideTopBar = false
+hideTopBar = true
 
 [browser]
 gatherUsageStats = false
+
+[server]
+enableXsrfProtection = false
+enableCORS = false
