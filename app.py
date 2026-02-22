@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
-import bcrypt  # IMPORTANTE: adicionar este import
+import bcrypt
 
 # Adicionar pastas ao path do Python
 current_dir = Path(__file__).parent
@@ -40,44 +40,23 @@ st.set_page_config(
 # ============================================
 st.markdown("""
     <style>
-        /* Esconder navegação de páginas do Streamlit */
-        [data-testid="stSidebarNav"] {
-            display: none;
-        }
-        
-        section[data-testid="stSidebarNav"] {
-            display: none !important;
-        }
-        
-        /* Esconder menu principal, footer e botões indesejados */
+        [data-testid="stSidebarNav"] { display: none; }
+        section[data-testid="stSidebarNav"] { display: none !important; }
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header[data-testid="stHeader"] {visibility: hidden;}
-        
-        /* Esconder botão Deploy e GitHub */
         .stDeployButton {display: none;}
         button[kind="header"] {display: none;}
-        
-        /* Esconder toolbar do GitHub */
         div[data-testid="stToolbar"] {display: none;}
-        
-        /* ESCONDER BOTÃO "MANAGE APP" NO CANTO INFERIOR DIREITO */
         .stAppDeployButton {display: none !important;}
         div[data-testid="stStatusWidget"] {display: none !important;}
         button[data-testid="baseButton-header"] {display: none !important;}
         section[data-testid="stSidebar"] button[kind="header"] {display: none !important;}
         div[data-testid="stDecoration"] {display: none !important;}
-        
-        /* Esconder status bar e elementos flutuantes */
         div[data-testid="stBottom"] {display: none !important;}
-        .element-container:has(iframe[title="streamlit_app"]) {display: none !important;}
-        
-        /* Esconder ícone de status/conexão */
         div[class*="viewerBadge"] {display: none !important;}
         .viewerBadge_container__1QSob {display: none !important;}
         .styles_viewerBadge__1yB5_ {display: none !important;}
-        
-        /* CSS da página de login */
         .login-header {
             text-align: center;
             padding: 2rem 0;
@@ -86,6 +65,24 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ============================================
+# HELPER: APLICAR TEMA
+# ============================================
+
+def aplicar_tema(tema):
+    """Aplica tema claro ou escuro via config"""
+    if tema == "dark":
+        st._config.set_option('theme.base', 'dark')
+        st._config.set_option('theme.backgroundColor', '#121212')
+        st._config.set_option('theme.secondaryBackgroundColor', '#1f1f1f')
+        st._config.set_option('theme.textColor', '#f5f5f5')
+        st._config.set_option('theme.primaryColor', '#bb86fc')
+    else:
+        st._config.set_option('theme.base', 'light')
+        st._config.set_option('theme.backgroundColor', '#ffffff')
+        st._config.set_option('theme.secondaryBackgroundColor', '#f0f2f6')
+        st._config.set_option('theme.textColor', '#000000')
+        st._config.set_option('theme.primaryColor', '#ff6b35')
 
 # ============================================
 # INICIALIZAR SESSION STATE
@@ -95,7 +92,8 @@ if 'auth_status' not in st.session_state:
     st.session_state.update({
         'auth_status': False,
         'user_info': {},
-        'must_change_pass': False
+        'must_change_pass': False,
+        'dark_mode': True  # escuro por defeito
     })
 
 # ============================================
@@ -142,13 +140,10 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
                 st.error("❌ Não pode usar a password padrão '1234'")
             else:
                 try:
-                    # Atualizar password na base de dados (ENCRIPTADA)
                     nova_password_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                    
                     base.update_row("Utilizadores", user['row_id'], {
                         "Password": nova_password_hash
                     })
-                    
                     st.session_state['must_change_pass'] = False
                     st.success("✅ Password alterada com sucesso!")
                     st.rerun()
@@ -164,7 +159,6 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
 if not st.session_state['auth_status']:
     st.markdown('<h1 class="login-header">🎵 Banda Municipal de Oeiras</h1>', unsafe_allow_html=True)
     
-    # Centralizar form de login
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
@@ -188,7 +182,6 @@ if not st.session_state['auth_status']:
                 if not u_in or not p_in:
                     st.error("⚠️ Preencha todos os campos")
                 else:
-                    # Buscar utilizadores
                     try:
                         users_list = base.list_rows("Utilizadores")
                         df_users = pd.DataFrame(users_list) if users_list else pd.DataFrame()
@@ -196,7 +189,6 @@ if not st.session_state['auth_status']:
                         if df_users.empty:
                             st.error("❌ Erro ao carregar utilizadores da base de dados")
                         else:
-                            # Procurar utilizador
                             match = df_users[df_users['Username'].str.lower() == u_in]
                             
                             if match.empty:
@@ -205,37 +197,40 @@ if not st.session_state['auth_status']:
                                 row = match.iloc[0]
                                 stored_pass = str(row.get('Password', ''))
                                 
-                                # Verificar se password é válida
                                 password_correta = False
                                 precisa_trocar = False
                                 
-                                # Caso 1: Password padrão "1234" (texto simples)
                                 if stored_pass == "1234":
                                     if p_in == "1234":
                                         password_correta = True
                                         precisa_trocar = True
                                 
-                                # Caso 2: Password encriptada com bcrypt (começa com $2b$)
                                 elif stored_pass.startswith('$2b$'):
                                     try:
-                                        # USAR bcrypt.checkpw() para verificar
                                         if bcrypt.checkpw(p_in.encode('utf-8'), stored_pass.encode('utf-8')):
                                             password_correta = True
                                             precisa_trocar = False
                                     except Exception:
                                         password_correta = False
                                 
-                                # Caso 3: Password em texto simples (não recomendado)
                                 else:
                                     if p_in == stored_pass:
                                         password_correta = True
                                         precisa_trocar = False
                                 
                                 if password_correta:
-                                    # Login bem-sucedido
+                                    # Carregar preferência de tema guardada no SeaTable
+                                    tema_guardado = str(row.get('Tema', 'dark')).strip().lower()
+                                    if tema_guardado not in ['dark', 'light']:
+                                        tema_guardado = 'dark'
+                                    
+                                    # Aplicar tema imediatamente ao fazer login
+                                    aplicar_tema(tema_guardado)
+                                    
                                     st.session_state.update({
                                         'auth_status': True,
                                         'must_change_pass': precisa_trocar,
+                                        'dark_mode': tema_guardado == 'dark',
                                         'user_info': {
                                             'username': u_in,
                                             'display_name': row.get('Nome', u_in),
@@ -259,6 +254,10 @@ if not st.session_state['auth_status']:
 else:
     user = st.session_state['user_info']
     
+    # Aplicar tema guardado na sessão a cada rerun
+    tema_atual = 'dark' if st.session_state.get('dark_mode', True) else 'light'
+    aplicar_tema(tema_atual)
+    
     # ============================================
     # SIDEBAR COMUM
     # ============================================
@@ -269,6 +268,33 @@ else:
         
         st.write(f"👤 **{user['display_name']}**")
         st.caption(f"_{user['role']}_")
+        
+        st.divider()
+        
+        # ========================================
+        # TOGGLE TEMA CLARO / ESCURO
+        # ========================================
+        modo_escuro = st.toggle(
+            "🌙 Modo Escuro",
+            value=st.session_state.get('dark_mode', True),
+            help="Alterna entre tema claro e escuro"
+        )
+        
+        # Detetar mudança de tema
+        if modo_escuro != st.session_state.get('dark_mode', True):
+            st.session_state['dark_mode'] = modo_escuro
+            novo_tema = 'dark' if modo_escuro else 'light'
+            
+            # Guardar preferência no SeaTable
+            try:
+                base.update_row("Utilizadores", user['row_id'], {
+                    "Tema": novo_tema
+                })
+            except Exception:
+                pass  # Falha silenciosa, não é crítico
+            
+            aplicar_tema(novo_tema)
+            st.rerun()
         
         st.divider()
         
