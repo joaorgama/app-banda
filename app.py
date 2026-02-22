@@ -4,16 +4,13 @@ import sys
 from pathlib import Path
 import bcrypt
 
-# Adicionar pastas ao path do Python
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir / "pages"))
 sys.path.insert(0, str(current_dir / "utils"))
 
-# Imports das utils
 from seatable_conn import get_base
 from helpers import hash_password, DEFAULT_PASS
 
-# Imports das páginas
 import musico
 import professor
 import maestro
@@ -36,19 +33,14 @@ st.set_page_config(
 )
 
 # ============================================
-# CSS BASE (PROTEÇÃO - SEM ESCONDER HEADER)
+# CSS BASE
 # ============================================
 st.markdown("""
     <style>
-        /* Esconder navegação automática do Streamlit */
         [data-testid="stSidebarNav"] { display: none; }
         section[data-testid="stSidebarNav"] { display: none !important; }
-
-        /* Esconder menu e footer */
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
-
-        /* Esconder botões Deploy/GitHub/Manage - ESPECÍFICOS */
         .stDeployButton { display: none !important; }
         div[data-testid="stToolbar"] { display: none !important; }
         .stAppDeployButton { display: none !important; }
@@ -58,11 +50,7 @@ st.markdown("""
         div[class*="viewerBadge"] { display: none !important; }
         .viewerBadge_container__1QSob { display: none !important; }
         .styles_viewerBadge__1yB5_ { display: none !important; }
-
-        /* Manter APENAS o botão de colapso da sidebar visível */
         [data-testid="collapsedControl"] { display: flex !important; }
-
-        /* CSS página de login */
         .login-header {
             text-align: center;
             padding: 2rem 0;
@@ -76,25 +64,14 @@ st.markdown("""
 # ============================================
 
 def aplicar_tema_css(dark):
-    """Aplica tema claro ou escuro via CSS injetado"""
     if dark:
         st.markdown("""
             <style>
-            .stApp, [data-testid="stAppViewContainer"] {
-                background-color: #121212 !important;
-            }
-            [data-testid="stSidebar"] {
-                background-color: #1f1f1f !important;
-            }
-            [data-testid="stSidebar"] * {
-                color: #f5f5f5 !important;
-            }
-            .stMarkdown, p, span, label, div {
-                color: #f5f5f5;
-            }
-            h1, h2, h3, h4 {
-                color: #f5f5f5 !important;
-            }
+            .stApp, [data-testid="stAppViewContainer"] { background-color: #121212 !important; }
+            [data-testid="stSidebar"] { background-color: #1f1f1f !important; }
+            [data-testid="stSidebar"] * { color: #f5f5f5 !important; }
+            .stMarkdown, p, span, label, div { color: #f5f5f5; }
+            h1, h2, h3, h4 { color: #f5f5f5 !important; }
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
@@ -102,43 +79,21 @@ def aplicar_tema_css(dark):
                 color: #f5f5f5 !important;
                 border-color: #444 !important;
             }
-            .stExpander {
-                background-color: #1f1f1f !important;
-                border-color: #444 !important;
-            }
-            [data-testid="stForm"] {
-                background-color: #1f1f1f !important;
-                border-color: #444 !important;
-            }
-            .stTabs [data-baseweb="tab-list"] {
-                background-color: #1f1f1f !important;
-            }
-            .stTabs [data-baseweb="tab"] {
-                color: #f5f5f5 !important;
-            }
-            .stDataFrame {
-                background-color: #1f1f1f !important;
-            }
+            .stExpander { background-color: #1f1f1f !important; border-color: #444 !important; }
+            [data-testid="stForm"] { background-color: #1f1f1f !important; border-color: #444 !important; }
+            .stTabs [data-baseweb="tab-list"] { background-color: #1f1f1f !important; }
+            .stTabs [data-baseweb="tab"] { color: #f5f5f5 !important; }
+            .stDataFrame { background-color: #1f1f1f !important; }
             </style>
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
             <style>
-            .stApp, [data-testid="stAppViewContainer"] {
-                background-color: #ffffff !important;
-            }
-            [data-testid="stSidebar"] {
-                background-color: #f0f2f6 !important;
-            }
-            [data-testid="stSidebar"] * {
-                color: #000000 !important;
-            }
-            .stMarkdown, p, span, label, div {
-                color: #000000;
-            }
-            h1, h2, h3, h4 {
-                color: #000000 !important;
-            }
+            .stApp, [data-testid="stAppViewContainer"] { background-color: #ffffff !important; }
+            [data-testid="stSidebar"] { background-color: #f0f2f6 !important; }
+            [data-testid="stSidebar"] * { color: #000000 !important; }
+            .stMarkdown, p, span, label, div { color: #000000; }
+            h1, h2, h3, h4 { color: #000000 !important; }
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
@@ -146,20 +101,10 @@ def aplicar_tema_css(dark):
                 color: #000000 !important;
                 border-color: #cccccc !important;
             }
-            .stExpander {
-                background-color: #f0f2f6 !important;
-                border-color: #cccccc !important;
-            }
-            [data-testid="stForm"] {
-                background-color: #f0f2f6 !important;
-                border-color: #cccccc !important;
-            }
-            .stTabs [data-baseweb="tab-list"] {
-                background-color: #f0f2f6 !important;
-            }
-            .stTabs [data-baseweb="tab"] {
-                color: #000000 !important;
-            }
+            .stExpander { background-color: #f0f2f6 !important; border-color: #cccccc !important; }
+            [data-testid="stForm"] { background-color: #f0f2f6 !important; border-color: #cccccc !important; }
+            .stTabs [data-baseweb="tab-list"] { background-color: #f0f2f6 !important; }
+            .stTabs [data-baseweb="tab"] { color: #000000 !important; }
             </style>
         """, unsafe_allow_html=True)
 
@@ -186,6 +131,65 @@ if not base:
     st.stop()
 
 # ============================================
+# APLICAR TEMA (SEMPRE, EM CADA RERUN)
+# ============================================
+
+aplicar_tema_css(st.session_state.get('dark_mode', True))
+
+# ============================================
+# SIDEBAR — SEMPRE VISÍVEL (LOGIN E AUTENTICADO)
+# ============================================
+
+with st.sidebar:
+    st.image("https://img.icons8.com/emoji/48/musical-notes.png", width=40)
+    st.title("BMO Portal")
+    st.divider()
+
+    if st.session_state.get('auth_status'):
+        user = st.session_state['user_info']
+        st.write(f"👤 **{user['display_name']}**")
+        st.caption(f"_{user['role']}_")
+        st.divider()
+
+    # ========================================
+    # TOGGLE TEMA — SEMPRE VISÍVEL
+    # ========================================
+    modo_escuro = st.toggle(
+        "🌙 Modo Escuro",
+        value=st.session_state.get('dark_mode', True),
+        help="Alterna entre tema claro e escuro"
+    )
+
+    if modo_escuro != st.session_state.get('dark_mode', True):
+        st.session_state['dark_mode'] = modo_escuro
+        # Guardar no SeaTable apenas se estiver autenticado
+        if st.session_state.get('auth_status'):
+            try:
+                base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {
+                    "Tema": 'dark' if modo_escuro else 'light'
+                })
+            except Exception:
+                pass
+        st.rerun()
+
+    if st.session_state.get('auth_status'):
+        st.divider()
+        if st.button("🚪 Sair", use_container_width=True, type="primary"):
+            st.session_state.clear()
+            st.rerun()
+
+        st.divider()
+        with st.expander("ℹ️ Sobre"):
+            st.write("""
+            **Banda Municipal de Oeiras**
+            
+            Portal de gestão para músicos, 
+            professores, maestros e direção.
+            
+            Versão: 2.0
+            """)
+
+# ============================================
 # FORÇAR MUDANÇA DE PASSWORD
 # ============================================
 
@@ -199,16 +203,8 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
     st.info("Por favor, defina uma nova password antes de continuar.")
     
     with st.form("change_password"):
-        new_pass = st.text_input(
-            "🔑 Nova Password",
-            type="password",
-            help="Mínimo 4 caracteres"
-        )
-        
-        confirm_pass = st.text_input(
-            "🔑 Confirmar Password",
-            type="password"
-        )
+        new_pass = st.text_input("🔑 Nova Password", type="password", help="Mínimo 4 caracteres")
+        confirm_pass = st.text_input("🔑 Confirmar Password", type="password")
         
         if st.form_submit_button("💾 Guardar Nova Password", use_container_width=True):
             if len(new_pass) < 4:
@@ -220,9 +216,7 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
             else:
                 try:
                     nova_password_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                    base.update_row("Utilizadores", user['row_id'], {
-                        "Password": nova_password_hash
-                    })
+                    base.update_row("Utilizadores", user['row_id'], {"Password": nova_password_hash})
                     st.session_state['must_change_pass'] = False
                     st.success("✅ Password alterada com sucesso!")
                     st.rerun()
@@ -244,16 +238,8 @@ if not st.session_state['auth_status']:
         with st.form("login_form", clear_on_submit=False):
             st.subheader("Entrar no Portal")
             
-            u_in = st.text_input(
-                "👤 Utilizador",
-                placeholder="Introduza o seu username"
-            ).strip().lower()
-            
-            p_in = st.text_input(
-                "🔒 Password",
-                type="password",
-                placeholder="Introduza a sua password"
-            ).strip()
+            u_in = st.text_input("👤 Utilizador", placeholder="Introduza o seu username").strip().lower()
+            p_in = st.text_input("🔒 Password", type="password", placeholder="Introduza a sua password").strip()
             
             submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
             
@@ -283,22 +269,17 @@ if not st.session_state['auth_status']:
                                     if p_in == "1234":
                                         password_correta = True
                                         precisa_trocar = True
-                                
                                 elif stored_pass.startswith('$2b$'):
                                     try:
                                         if bcrypt.checkpw(p_in.encode('utf-8'), stored_pass.encode('utf-8')):
                                             password_correta = True
-                                            precisa_trocar = False
                                     except Exception:
                                         password_correta = False
-                                
                                 else:
                                     if p_in == stored_pass:
                                         password_correta = True
-                                        precisa_trocar = False
                                 
                                 if password_correta:
-                                    # Carregar preferência de tema guardada no SeaTable
                                     tema_guardado = str(row.get('Tema', 'dark')).strip().lower()
                                     if tema_guardado not in ['dark', 'light']:
                                         tema_guardado = 'dark'
@@ -324,96 +305,30 @@ if not st.session_state['auth_status']:
                         st.info("💡 Verifique se a tabela 'Utilizadores' existe no SeaTable")
 
 # ============================================
-# ÁREA AUTENTICADA (APÓS LOGIN)
+# ÁREA AUTENTICADA
 # ============================================
 
 else:
     user = st.session_state['user_info']
     
-    # Aplicar tema CSS em cada rerun
-    aplicar_tema_css(st.session_state.get('dark_mode', True))
-    
-    # ============================================
-    # SIDEBAR COMUM
-    # ============================================
-    
-    with st.sidebar:
-        st.title("🎵 BMO Portal")
-        st.divider()
-        
-        st.write(f"👤 **{user['display_name']}**")
-        st.caption(f"_{user['role']}_")
-        
-        st.divider()
-        
-        # ========================================
-        # TOGGLE TEMA CLARO / ESCURO
-        # ========================================
-        modo_escuro = st.toggle(
-            "🌙 Modo Escuro",
-            value=st.session_state.get('dark_mode', True),
-            help="Alterna entre tema claro e escuro"
-        )
-        
-        if modo_escuro != st.session_state.get('dark_mode', True):
-            st.session_state['dark_mode'] = modo_escuro
-            novo_tema = 'dark' if modo_escuro else 'light'
-            try:
-                base.update_row("Utilizadores", user['row_id'], {
-                    "Tema": novo_tema
-                })
-            except Exception:
-                pass
-            st.rerun()
-        
-        st.divider()
-        
-        # Botão de logout
-        if st.button("🚪 Sair", use_container_width=True, type="primary"):
-            st.session_state.clear()
-            st.rerun()
-        
-        st.divider()
-        
-        # Informações adicionais
-        with st.expander("ℹ️ Sobre"):
-            st.write("""
-            **Banda Municipal de Oeiras**
-            
-            Portal de gestão para músicos, 
-            professores, maestros e direção.
-            
-            Versão: 2.0
-            """)
-    
-    # ============================================
-    # ROUTER - REDIRECIONAR PARA PÁGINA CORRETA
-    # ============================================
-    
     try:
         if user['role'] == "Musico":
             musico.render(base, user)
-        
         elif user['role'] == "Professor":
             professor.render(base, user)
-        
         elif user['role'] == "Maestro":
             maestro.render(base, user)
-        
         elif user['role'] == "Direcao":
             direcao.render(base, user)
-        
         else:
             st.error(f"⚠️ Role '{user['role']}' não reconhecido")
             st.info("Roles válidos: Musico, Professor, Maestro, Direcao")
-            
             if st.button("🔄 Tentar novamente"):
                 st.rerun()
     
     except Exception as e:
         st.error(f"❌ Erro ao carregar a página: {str(e)}")
         st.exception(e)
-        
         if st.button("🔄 Recarregar"):
             st.rerun()
 
