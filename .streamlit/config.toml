@@ -3,7 +3,7 @@ toolbarMode = "minimal"
 showErrorDetails = false
 
 [ui]
-hideTopBar = true
+hideTopBar = false
 
 [browser]
 gatherUsageStats = false
