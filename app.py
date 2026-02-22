@@ -48,7 +48,7 @@ st.markdown("""
         #MainMenu { visibility: hidden; }
         footer { visibility: hidden; }
 
-        /* Esconder botões Deploy/GitHub/Manage */
+        /* Esconder botões Deploy/GitHub/Manage - ESPECÍFICOS */
         .stDeployButton { display: none !important; }
         div[data-testid="stToolbar"] { display: none !important; }
         .stAppDeployButton { display: none !important; }
@@ -58,6 +58,9 @@ st.markdown("""
         div[class*="viewerBadge"] { display: none !important; }
         .viewerBadge_container__1QSob { display: none !important; }
         .styles_viewerBadge__1yB5_ { display: none !important; }
+
+        /* Manter APENAS o botão de colapso da sidebar visível */
+        [data-testid="collapsedControl"] { display: flex !important; }
 
         /* CSS página de login */
         .login-header {
