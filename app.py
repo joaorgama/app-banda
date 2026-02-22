@@ -36,27 +36,30 @@ st.set_page_config(
 )
 
 # ============================================
-# CSS CUSTOMIZADO (COM PROTEÇÃO TOTAL)
+# CSS BASE (PROTEÇÃO - SEM ESCONDER HEADER)
 # ============================================
 st.markdown("""
     <style>
+        /* Esconder navegação automática do Streamlit */
         [data-testid="stSidebarNav"] { display: none; }
         section[data-testid="stSidebarNav"] { display: none !important; }
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header[data-testid="stHeader"] {visibility: hidden;}
-        .stDeployButton {display: none;}
-        button[kind="header"] {display: none;}
-        div[data-testid="stToolbar"] {display: none;}
-        .stAppDeployButton {display: none !important;}
-        div[data-testid="stStatusWidget"] {display: none !important;}
-        button[data-testid="baseButton-header"] {display: none !important;}
-        section[data-testid="stSidebar"] button[kind="header"] {display: none !important;}
-        div[data-testid="stDecoration"] {display: none !important;}
-        div[data-testid="stBottom"] {display: none !important;}
-        div[class*="viewerBadge"] {display: none !important;}
-        .viewerBadge_container__1QSob {display: none !important;}
-        .styles_viewerBadge__1yB5_ {display: none !important;}
+
+        /* Esconder menu e footer */
+        #MainMenu { visibility: hidden; }
+        footer { visibility: hidden; }
+
+        /* Esconder botões Deploy/GitHub/Manage */
+        .stDeployButton { display: none !important; }
+        div[data-testid="stToolbar"] { display: none !important; }
+        .stAppDeployButton { display: none !important; }
+        div[data-testid="stStatusWidget"] { display: none !important; }
+        div[data-testid="stDecoration"] { display: none !important; }
+        div[data-testid="stBottom"] { display: none !important; }
+        div[class*="viewerBadge"] { display: none !important; }
+        .viewerBadge_container__1QSob { display: none !important; }
+        .styles_viewerBadge__1yB5_ { display: none !important; }
+
+        /* CSS página de login */
         .login-header {
             text-align: center;
             padding: 2rem 0;
@@ -66,23 +69,96 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================
-# HELPER: APLICAR TEMA
+# HELPER: APLICAR TEMA VIA CSS
 # ============================================
 
-def aplicar_tema(tema):
-    """Aplica tema claro ou escuro via config"""
-    if tema == "dark":
-        st._config.set_option('theme.base', 'dark')
-        st._config.set_option('theme.backgroundColor', '#121212')
-        st._config.set_option('theme.secondaryBackgroundColor', '#1f1f1f')
-        st._config.set_option('theme.textColor', '#f5f5f5')
-        st._config.set_option('theme.primaryColor', '#bb86fc')
+def aplicar_tema_css(dark):
+    """Aplica tema claro ou escuro via CSS injetado"""
+    if dark:
+        st.markdown("""
+            <style>
+            .stApp, [data-testid="stAppViewContainer"] {
+                background-color: #121212 !important;
+            }
+            [data-testid="stSidebar"] {
+                background-color: #1f1f1f !important;
+            }
+            [data-testid="stSidebar"] * {
+                color: #f5f5f5 !important;
+            }
+            .stMarkdown, p, span, label, div {
+                color: #f5f5f5;
+            }
+            h1, h2, h3, h4 {
+                color: #f5f5f5 !important;
+            }
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea,
+            .stSelectbox > div > div {
+                background-color: #2a2a2a !important;
+                color: #f5f5f5 !important;
+                border-color: #444 !important;
+            }
+            .stExpander {
+                background-color: #1f1f1f !important;
+                border-color: #444 !important;
+            }
+            [data-testid="stForm"] {
+                background-color: #1f1f1f !important;
+                border-color: #444 !important;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                background-color: #1f1f1f !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                color: #f5f5f5 !important;
+            }
+            .stDataFrame {
+                background-color: #1f1f1f !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
     else:
-        st._config.set_option('theme.base', 'light')
-        st._config.set_option('theme.backgroundColor', '#ffffff')
-        st._config.set_option('theme.secondaryBackgroundColor', '#f0f2f6')
-        st._config.set_option('theme.textColor', '#000000')
-        st._config.set_option('theme.primaryColor', '#ff6b35')
+        st.markdown("""
+            <style>
+            .stApp, [data-testid="stAppViewContainer"] {
+                background-color: #ffffff !important;
+            }
+            [data-testid="stSidebar"] {
+                background-color: #f0f2f6 !important;
+            }
+            [data-testid="stSidebar"] * {
+                color: #000000 !important;
+            }
+            .stMarkdown, p, span, label, div {
+                color: #000000;
+            }
+            h1, h2, h3, h4 {
+                color: #000000 !important;
+            }
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea,
+            .stSelectbox > div > div {
+                background-color: #ffffff !important;
+                color: #000000 !important;
+                border-color: #cccccc !important;
+            }
+            .stExpander {
+                background-color: #f0f2f6 !important;
+                border-color: #cccccc !important;
+            }
+            [data-testid="stForm"] {
+                background-color: #f0f2f6 !important;
+                border-color: #cccccc !important;
+            }
+            .stTabs [data-baseweb="tab-list"] {
+                background-color: #f0f2f6 !important;
+            }
+            .stTabs [data-baseweb="tab"] {
+                color: #000000 !important;
+            }
+            </style>
+        """, unsafe_allow_html=True)
 
 # ============================================
 # INICIALIZAR SESSION STATE
@@ -93,7 +169,7 @@ if 'auth_status' not in st.session_state:
         'auth_status': False,
         'user_info': {},
         'must_change_pass': False,
-        'dark_mode': True  # escuro por defeito
+        'dark_mode': True
     })
 
 # ============================================
@@ -224,9 +300,6 @@ if not st.session_state['auth_status']:
                                     if tema_guardado not in ['dark', 'light']:
                                         tema_guardado = 'dark'
                                     
-                                    # Aplicar tema imediatamente ao fazer login
-                                    aplicar_tema(tema_guardado)
-                                    
                                     st.session_state.update({
                                         'auth_status': True,
                                         'must_change_pass': precisa_trocar,
@@ -254,9 +327,8 @@ if not st.session_state['auth_status']:
 else:
     user = st.session_state['user_info']
     
-    # Aplicar tema guardado na sessão a cada rerun
-    tema_atual = 'dark' if st.session_state.get('dark_mode', True) else 'light'
-    aplicar_tema(tema_atual)
+    # Aplicar tema CSS em cada rerun
+    aplicar_tema_css(st.session_state.get('dark_mode', True))
     
     # ============================================
     # SIDEBAR COMUM
@@ -280,20 +352,15 @@ else:
             help="Alterna entre tema claro e escuro"
         )
         
-        # Detetar mudança de tema
         if modo_escuro != st.session_state.get('dark_mode', True):
             st.session_state['dark_mode'] = modo_escuro
             novo_tema = 'dark' if modo_escuro else 'light'
-            
-            # Guardar preferência no SeaTable
             try:
                 base.update_row("Utilizadores", user['row_id'], {
                     "Tema": novo_tema
                 })
             except Exception:
-                pass  # Falha silenciosa, não é crítico
-            
-            aplicar_tema(novo_tema)
+                pass
             st.rerun()
         
         st.divider()
@@ -354,7 +421,7 @@ else:
 st.markdown("---")
 st.markdown(
     "<p style='text-align: center; color: gray; font-size: 0.8rem;'>"
-    "© 2026 Banda Municipal de Oeiras | Desenvolvido com ❤️ e 🎵"
+    "© 2026 Banda Municipal de Oeiras"
     "</p>",
     unsafe_allow_html=True
 )
