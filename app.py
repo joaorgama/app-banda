@@ -141,8 +141,7 @@ aplicar_tema_css(st.session_state.get('dark_mode', True))
 # ============================================
 
 with st.sidebar:
-    st.image("https://img.icons8.com/emoji/48/musical-notes.png", width=40)
-    st.title("BMO Portal")
+    st.title("🎵 BMO Portal")
     st.divider()
 
     if st.session_state.get('auth_status'):
@@ -152,21 +151,23 @@ with st.sidebar:
         st.divider()
 
     # ========================================
-    # TOGGLE TEMA — SEMPRE VISÍVEL
+    # BOTÃO TEMA CLARO / ESCURO — SEMPRE VISÍVEL
     # ========================================
-    modo_escuro = st.toggle(
-        "🌙 Modo Escuro",
-        value=st.session_state.get('dark_mode', True),
-        help="Alterna entre tema claro e escuro"
-    )
+    tema_atual = st.session_state.get('dark_mode', True)
 
-    if modo_escuro != st.session_state.get('dark_mode', True):
-        st.session_state['dark_mode'] = modo_escuro
-        # Guardar no SeaTable apenas se estiver autenticado
+    if tema_atual:
+        label_btn = "☀️ Modo Claro"
+    else:
+        label_btn = "🌙 Modo Escuro"
+
+    if st.button(label_btn, use_container_width=True):
+        novo_dark = not tema_atual
+        st.session_state['dark_mode'] = novo_dark
+        # Guardar no SeaTable apenas se autenticado
         if st.session_state.get('auth_status'):
             try:
                 base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {
-                    "Tema": 'dark' if modo_escuro else 'light'
+                    "Tema": 'dark' if novo_dark else 'light'
                 })
             except Exception:
                 pass
@@ -174,11 +175,13 @@ with st.sidebar:
 
     if st.session_state.get('auth_status'):
         st.divider()
+
         if st.button("🚪 Sair", use_container_width=True, type="primary"):
             st.session_state.clear()
             st.rerun()
 
         st.divider()
+
         with st.expander("ℹ️ Sobre"):
             st.write("""
             **Banda Municipal de Oeiras**
