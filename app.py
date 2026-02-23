@@ -56,7 +56,6 @@ st.markdown("""
             padding: 2rem 0;
             color: #ff6b35;
         }
-        /* Botão de tema fixo no canto superior direito */
         .btn-tema-fixo {
             position: fixed;
             top: 0.6rem;
@@ -79,6 +78,11 @@ def aplicar_tema_css(dark):
             [data-testid="stSidebar"] * { color: #f5f5f5 !important; }
             .stMarkdown, p, span, label, div { color: #f5f5f5; }
             h1, h2, h3, h4 { color: #f5f5f5 !important; }
+
+            /* ✅ CORREÇÃO: texto branco nos botões em modo escuro */
+            .stButton > button { color: #f5f5f5 !important; }
+            .stButton > button p { color: #f5f5f5 !important; }
+
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
@@ -101,6 +105,11 @@ def aplicar_tema_css(dark):
             [data-testid="stSidebar"] * { color: #000000 !important; }
             .stMarkdown, p, span, label, div { color: #000000; }
             h1, h2, h3, h4 { color: #000000 !important; }
+
+            /* Texto preto nos botões em modo claro */
+            .stButton > button { color: #000000 !important; }
+            .stButton > button p { color: #000000 !important; }
+
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
