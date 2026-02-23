@@ -56,6 +56,13 @@ st.markdown("""
             padding: 2rem 0;
             color: #ff6b35;
         }
+        /* Botão de tema fixo no canto superior direito */
+        .btn-tema-fixo {
+            position: fixed;
+            top: 0.6rem;
+            right: 1rem;
+            z-index: 9999;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -137,6 +144,27 @@ if not base:
 aplicar_tema_css(st.session_state.get('dark_mode', True))
 
 # ============================================
+# BOTÃO TEMA — TOPO DA PÁGINA (SEMPRE VISÍVEL)
+# ============================================
+
+tema_atual = st.session_state.get('dark_mode', True)
+label_btn_tema = "☀️ Modo Claro" if tema_atual else "🌙 Modo Escuro"
+
+col_spacer, col_tema = st.columns([9, 1])
+with col_tema:
+    if st.button(label_btn_tema, key="btn_tema_topo"):
+        novo_dark = not tema_atual
+        st.session_state['dark_mode'] = novo_dark
+        if st.session_state.get('auth_status'):
+            try:
+                base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {
+                    "Tema": 'dark' if novo_dark else 'light'
+                })
+            except Exception:
+                pass
+        st.rerun()
+
+# ============================================
 # SIDEBAR — SEMPRE VISÍVEL (LOGIN E AUTENTICADO)
 # ============================================
 
@@ -148,32 +176,6 @@ with st.sidebar:
         user = st.session_state['user_info']
         st.write(f"👤 **{user['display_name']}**")
         st.caption(f"_{user['role']}_")
-        st.divider()
-
-    # ========================================
-    # BOTÃO TEMA CLARO / ESCURO — SEMPRE VISÍVEL
-    # ========================================
-    tema_atual = st.session_state.get('dark_mode', True)
-
-    if tema_atual:
-        label_btn = "☀️ Modo Claro"
-    else:
-        label_btn = "🌙 Modo Escuro"
-
-    if st.button(label_btn, use_container_width=True):
-        novo_dark = not tema_atual
-        st.session_state['dark_mode'] = novo_dark
-        # Guardar no SeaTable apenas se autenticado
-        if st.session_state.get('auth_status'):
-            try:
-                base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {
-                    "Tema": 'dark' if novo_dark else 'light'
-                })
-            except Exception:
-                pass
-        st.rerun()
-
-    if st.session_state.get('auth_status'):
         st.divider()
 
         if st.button("🚪 Sair", use_container_width=True, type="primary"):
