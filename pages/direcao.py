@@ -63,7 +63,7 @@ def render(base, user):
         
         st.divider()
         
-        # Listar eventos com detalhes de presenças
+        # Listar eventos
         try:
             eventos = base.list_rows("Eventos")
             presencas = base.list_rows("Presencas")
@@ -77,185 +77,270 @@ def render(base, user):
                 for e in eventos:
                     with st.expander(f"📝 {e.get('Nome do Evento')} - {formatar_data_pt(e.get('Data'))}"):
                         
-                        # Informações do evento
-                        col1, col2, col3 = st.columns([2, 2, 1])
-                        
-                        with col1:
-                            st.write(f"**Data:** {formatar_data_pt(e.get('Data'))}")
-                            st.write(f"**Hora:** {e.get('Hora', '---')}")
-                            st.write(f"**Tipo:** {e.get('Tipo', 'Concerto')}")
-                        
-                        with col2:
-                            # Estatísticas rápidas
-                            pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
-                            vao = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
-                            nao_vao = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
-                            talvez = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
-                            pendentes = len(musicos) - len(pres_evento)
-                            
-                            st.metric("✅ Confirmados", vao)
-                            st.caption(f"❌ Não Vão: {nao_vao} | ❓ Talvez: {talvez} | ⏳ Pendentes: {pendentes}")
-                        
-                        with col3:
-                            if st.button("🗑️ Apagar", key=f"del_ev_{e['_id']}", type="secondary"):
-                                try:
-                                    base.delete_row("Eventos", e['_id'])
-                                    st.success("Evento removido!")
-                                    st.rerun()
-                                except Exception as e_error:
-                                    st.error(f"Erro: {e_error}")
-                        
-                        st.divider()
-                        
                         # ========================================
-                        # LISTA DETALHADA DE PRESENÇAS
+                        # MODO: VER / EDITAR (controlado por session_state)
                         # ========================================
-                        if musicos:
-                            st.subheader("🎼 Presenças por Músico")
+                        edit_key = f"edit_mode_{e['_id']}"
+                        if edit_key not in st.session_state:
+                            st.session_state[edit_key] = False
+                        
+                        # ----------------------------------------
+                        # MODO DE EDIÇÃO
+                        # ----------------------------------------
+                        if st.session_state[edit_key]:
+                            st.markdown("#### ✏️ Editar Evento")
                             
-                            # Criar dicionário de respostas
-                            respostas_dict = {}
-                            for p in pres_evento:
-                                username_p = p.get('Username')
-                                if username_p:
-                                    username_key = str(username_p).lower().strip()
-                                    respostas_dict[username_key] = p.get('Resposta')
-                            
-                            # Criar lista com todos os músicos e suas respostas
-                            lista_musicos = []
-                            for m in musicos:
-                                # Verificação segura do username
-                                username_raw = m.get('Username')
-                                if username_raw and str(username_raw).strip():
-                                    username = str(username_raw).lower().strip()
-                                else:
-                                    username = str(m.get('Nome', '')).lower().strip()
+                            with st.form(f"form_edit_{e['_id']}"):
+                                col1, col2 = st.columns(2)
                                 
-                                nome = m.get('Nome', 'Desconhecido')
-                                
-                                # Verificação segura do instrumento
-                                instrumento_raw = m.get('Instrumento')
-                                if instrumento_raw and str(instrumento_raw).strip():
-                                    instrumento = str(instrumento_raw).strip()
-                                else:
-                                    instrumento = "Não definido"
-                                
-                                resposta = respostas_dict.get(username, 'Pendente')
-                                
-                                lista_musicos.append({
-                                    'Nome': nome,
-                                    'Instrumento': instrumento,
-                                    'Resposta': resposta
-                                })
-                            
-                            # Criar DataFrame
-                            df_musicos = pd.DataFrame(lista_musicos)
-                            
-                            # Ordenar por Instrumento e depois por Nome
-                            df_musicos = df_musicos.sort_values(['Instrumento', 'Nome'])
-                            
-                            # Filtro por resposta
-                            col_filtro1, col_filtro2 = st.columns([2, 2])
-                            
-                            with col_filtro1:
-                                filtro_resposta = st.multiselect(
-                                    "Filtrar por resposta:",
-                                    options=['Vou', 'Não Vou', 'Talvez', 'Pendente'],
-                                    default=['Vou', 'Não Vou', 'Talvez', 'Pendente'],
-                                    key=f"filtro_resp_{e['_id']}"
-                                )
-                            
-                            with col_filtro2:
-                                # Contar instrumentos únicos (excluindo "Não definido")
-                                instrumentos_definidos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
-                                num_naipes = len(instrumentos_definidos['Instrumento'].unique()) if not instrumentos_definidos.empty else 0
-                                st.caption(f"📊 Naipes definidos: {num_naipes}")
-                            
-                            # Aplicar filtro
-                            df_filtrado = df_musicos[df_musicos['Resposta'].isin(filtro_resposta)]
-                            
-                            # Adicionar emoji de status
-                            def add_emoji(resposta):
-                                if resposta == 'Vou':
-                                    return '✅ Vou'
-                                elif resposta == 'Não Vou':
-                                    return '❌ Não Vou'
-                                elif resposta == 'Talvez':
-                                    return '❓ Talvez'
-                                else:
-                                    return '⏳ Pendente'
-                            
-                            df_filtrado['Estado'] = df_filtrado['Resposta'].apply(add_emoji)
-                            
-                            # Exibir tabela interativa
-                            st.dataframe(
-                                df_filtrado[['Nome', 'Instrumento', 'Estado']],
-                                use_container_width=True,
-                                hide_index=True,
-                                column_config={
-                                    "Nome": st.column_config.TextColumn("👤 Músico", width="medium"),
-                                    "Instrumento": st.column_config.TextColumn("🎷 Instrumento", width="medium"),
-                                    "Estado": st.column_config.TextColumn("📋 Resposta", width="medium")
-                                }
-                            )
-                            
-                            # ========================================
-                            # ANÁLISE POR NAIPE (só se houver instrumentos definidos)
-                            # ========================================
-                            instrumentos_validos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
-                            
-                            if not instrumentos_validos.empty:
-                                st.divider()
-                                st.subheader("📊 Análise por Naipe")
-                                
-                                # Agrupar por instrumento
-                                naipes_stats = []
-                                for inst in sorted(instrumentos_validos['Instrumento'].unique()):
-                                    df_inst = df_musicos[df_musicos['Instrumento'] == inst]
-                                    total = len(df_inst)
-                                    vao_inst = len(df_inst[df_inst['Resposta'] == 'Vou'])
-                                    nao_vao_inst = len(df_inst[df_inst['Resposta'] == 'Não Vou'])
-                                    talvez_inst = len(df_inst[df_inst['Resposta'] == 'Talvez'])
-                                    pend_inst = len(df_inst[df_inst['Resposta'] == 'Pendente'])
+                                with col1:
+                                    nome_edit = st.text_input(
+                                        "Nome do Evento*",
+                                        value=e.get('Nome do Evento', '')
+                                    )
+                                    # Converter data existente
+                                    data_atual = e.get('Data', '')
+                                    try:
+                                        if data_atual:
+                                            data_obj = datetime.strptime(str(data_atual)[:10], '%Y-%m-%d').date()
+                                        else:
+                                            data_obj = datetime.now().date()
+                                    except Exception:
+                                        data_obj = datetime.now().date()
                                     
-                                    naipes_stats.append({
-                                        'Naipe': inst,
-                                        'Total': total,
-                                        '✅ Vão': vao_inst,
-                                        '❌ Não Vão': nao_vao_inst,
-                                        '❓ Talvez': talvez_inst,
-                                        '⏳ Pendentes': pend_inst
+                                    data_edit = st.date_input("Data*", value=data_obj)
+                                
+                                with col2:
+                                    hora_edit = st.text_input(
+                                        "Hora*",
+                                        value=e.get('Hora', '')
+                                    )
+                                    tipos = ["Concerto", "Ensaio", "Actuação", "Outro"]
+                                    tipo_atual = e.get('Tipo', 'Concerto')
+                                    tipo_idx = tipos.index(tipo_atual) if tipo_atual in tipos else 0
+                                    tipo_edit = st.selectbox("Tipo", tipos, index=tipo_idx)
+                                
+                                descricao_edit = st.text_area(
+                                    "Descrição",
+                                    value=e.get('Descricao', '')
+                                )
+                                cartaz_edit = st.text_input(
+                                    "URL do Cartaz",
+                                    value=e.get('Cartaz', '')
+                                )
+                                
+                                col_save, col_cancel = st.columns(2)
+                                
+                                with col_save:
+                                    guardar = st.form_submit_button(
+                                        "💾 Guardar Alterações",
+                                        use_container_width=True,
+                                        type="primary"
+                                    )
+                                with col_cancel:
+                                    cancelar = st.form_submit_button(
+                                        "❌ Cancelar",
+                                        use_container_width=True
+                                    )
+                                
+                                if guardar:
+                                    if not nome_edit or not hora_edit:
+                                        st.error("⚠️ Preencha todos os campos obrigatórios")
+                                    else:
+                                        try:
+                                            base.update_row("Eventos", e['_id'], {
+                                                "Nome do Evento": nome_edit,
+                                                "Data": str(data_edit),
+                                                "Hora": hora_edit,
+                                                "Tipo": tipo_edit,
+                                                "Descricao": descricao_edit,
+                                                "Cartaz": cartaz_edit
+                                            })
+                                            st.session_state[edit_key] = False
+                                            st.success("✅ Evento atualizado!")
+                                            st.rerun()
+                                        except Exception as e_edit:
+                                            st.error(f"❌ Erro ao guardar: {e_edit}")
+                                
+                                if cancelar:
+                                    st.session_state[edit_key] = False
+                                    st.rerun()
+                        
+                        # ----------------------------------------
+                        # MODO DE VISUALIZAÇÃO
+                        # ----------------------------------------
+                        else:
+                            col1, col2, col3 = st.columns([2, 2, 1])
+                            
+                            with col1:
+                                st.write(f"**Data:** {formatar_data_pt(e.get('Data'))}")
+                                st.write(f"**Hora:** {e.get('Hora', '---')}")
+                                st.write(f"**Tipo:** {e.get('Tipo', 'Concerto')}")
+                                if e.get('Descricao'):
+                                    st.write(f"**Descrição:** {e.get('Descricao')}")
+                            
+                            with col2:
+                                # Estatísticas rápidas de presenças
+                                pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
+                                vao = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
+                                nao_vao = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
+                                talvez = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
+                                pendentes = len(musicos) - len(pres_evento)
+                                
+                                st.metric("✅ Confirmados", vao)
+                                st.caption(f"❌ Não Vão: {nao_vao} | ❓ Talvez: {talvez} | ⏳ Pendentes: {pendentes}")
+                            
+                            with col3:
+                                # Botão Editar
+                                if st.button("✏️ Editar", key=f"btn_edit_{e['_id']}", use_container_width=True):
+                                    st.session_state[edit_key] = True
+                                    st.rerun()
+                                
+                                # Botão Apagar
+                                if st.button("🗑️ Apagar", key=f"del_ev_{e['_id']}", type="secondary", use_container_width=True):
+                                    try:
+                                        base.delete_row("Eventos", e['_id'])
+                                        st.success("Evento removido!")
+                                        st.rerun()
+                                    except Exception as e_error:
+                                        st.error(f"Erro: {e_error}")
+                            
+                            st.divider()
+                            
+                            # ========================================
+                            # LISTA DETALHADA DE PRESENÇAS
+                            # ========================================
+                            if musicos:
+                                st.subheader("🎼 Presenças por Músico")
+                                
+                                pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
+                                
+                                respostas_dict = {}
+                                for p in pres_evento:
+                                    username_p = p.get('Username')
+                                    if username_p:
+                                        username_key = str(username_p).lower().strip()
+                                        respostas_dict[username_key] = p.get('Resposta')
+                                
+                                lista_musicos = []
+                                for m in musicos:
+                                    username_raw = m.get('Username')
+                                    if username_raw and str(username_raw).strip():
+                                        username = str(username_raw).lower().strip()
+                                    else:
+                                        username = str(m.get('Nome', '')).lower().strip()
+                                    
+                                    nome_m = m.get('Nome', 'Desconhecido')
+                                    
+                                    instrumento_raw = m.get('Instrumento')
+                                    if instrumento_raw and str(instrumento_raw).strip():
+                                        instrumento = str(instrumento_raw).strip()
+                                    else:
+                                        instrumento = "Não definido"
+                                    
+                                    resposta = respostas_dict.get(username, 'Pendente')
+                                    
+                                    lista_musicos.append({
+                                        'Nome': nome_m,
+                                        'Instrumento': instrumento,
+                                        'Resposta': resposta
                                     })
                                 
-                                if naipes_stats:
-                                    df_naipes = pd.DataFrame(naipes_stats)
-                                    
-                                    # Exibir tabela de naipes
-                                    st.dataframe(
-                                        df_naipes,
-                                        use_container_width=True,
-                                        hide_index=True,
-                                        column_config={
-                                            "Naipe": st.column_config.TextColumn("🎷 Naipe", width="medium"),
-                                            "Total": st.column_config.NumberColumn("👥 Total", width="small"),
-                                            "✅ Vão": st.column_config.NumberColumn("✅ Vão", width="small"),
-                                            "❌ Não Vão": st.column_config.NumberColumn("❌ Não", width="small"),
-                                            "❓ Talvez": st.column_config.NumberColumn("❓ Talvez", width="small"),
-                                            "⏳ Pendentes": st.column_config.NumberColumn("⏳ Pend.", width="small")
-                                        }
+                                df_musicos = pd.DataFrame(lista_musicos)
+                                df_musicos = df_musicos.sort_values(['Instrumento', 'Nome'])
+                                
+                                col_filtro1, col_filtro2 = st.columns([2, 2])
+                                
+                                with col_filtro1:
+                                    filtro_resposta = st.multiselect(
+                                        "Filtrar por resposta:",
+                                        options=['Vou', 'Não Vou', 'Talvez', 'Pendente'],
+                                        default=['Vou', 'Não Vou', 'Talvez', 'Pendente'],
+                                        key=f"filtro_resp_{e['_id']}"
                                     )
+                                
+                                with col_filtro2:
+                                    instrumentos_definidos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
+                                    num_naipes = len(instrumentos_definidos['Instrumento'].unique()) if not instrumentos_definidos.empty else 0
+                                    st.caption(f"📊 Naipes definidos: {num_naipes}")
+                                
+                                df_filtrado = df_musicos[df_musicos['Resposta'].isin(filtro_resposta)]
+                                
+                                def add_emoji(resposta):
+                                    if resposta == 'Vou':
+                                        return '✅ Vou'
+                                    elif resposta == 'Não Vou':
+                                        return '❌ Não Vou'
+                                    elif resposta == 'Talvez':
+                                        return '❓ Talvez'
+                                    else:
+                                        return '⏳ Pendente'
+                                
+                                df_filtrado = df_filtrado.copy()
+                                df_filtrado['Estado'] = df_filtrado['Resposta'].apply(add_emoji)
+                                
+                                st.dataframe(
+                                    df_filtrado[['Nome', 'Instrumento', 'Estado']],
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    column_config={
+                                        "Nome": st.column_config.TextColumn("👤 Músico", width="medium"),
+                                        "Instrumento": st.column_config.TextColumn("🎷 Instrumento", width="medium"),
+                                        "Estado": st.column_config.TextColumn("📋 Resposta", width="medium")
+                                    }
+                                )
+                                
+                                # Análise por naipe
+                                instrumentos_validos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
+                                
+                                if not instrumentos_validos.empty:
+                                    st.divider()
+                                    st.subheader("📊 Análise por Naipe")
                                     
-                                    # Alerta de naipes vazios
-                                    naipes_vazios = df_naipes[df_naipes['✅ Vão'] == 0]
-                                    if not naipes_vazios.empty and len(naipes_vazios) > 0:
-                                        naipes_lista = naipes_vazios['Naipe'].tolist()
-                                        if naipes_lista:
-                                            st.warning(f"⚠️ **Atenção:** Os seguintes naipes não têm confirmações: {', '.join(naipes_lista)}")
+                                    naipes_stats = []
+                                    for inst in sorted(instrumentos_validos['Instrumento'].unique()):
+                                        df_inst = df_musicos[df_musicos['Instrumento'] == inst]
+                                        total = len(df_inst)
+                                        vao_inst = len(df_inst[df_inst['Resposta'] == 'Vou'])
+                                        nao_vao_inst = len(df_inst[df_inst['Resposta'] == 'Não Vou'])
+                                        talvez_inst = len(df_inst[df_inst['Resposta'] == 'Talvez'])
+                                        pend_inst = len(df_inst[df_inst['Resposta'] == 'Pendente'])
+                                        
+                                        naipes_stats.append({
+                                            'Naipe': inst,
+                                            'Total': total,
+                                            '✅ Vão': vao_inst,
+                                            '❌ Não Vão': nao_vao_inst,
+                                            '❓ Talvez': talvez_inst,
+                                            '⏳ Pendentes': pend_inst
+                                        })
+                                    
+                                    if naipes_stats:
+                                        df_naipes = pd.DataFrame(naipes_stats)
+                                        
+                                        st.dataframe(
+                                            df_naipes,
+                                            use_container_width=True,
+                                            hide_index=True,
+                                            column_config={
+                                                "Naipe": st.column_config.TextColumn("🎷 Naipe", width="medium"),
+                                                "Total": st.column_config.NumberColumn("👥 Total", width="small"),
+                                                "✅ Vão": st.column_config.NumberColumn("✅ Vão", width="small"),
+                                                "❌ Não Vão": st.column_config.NumberColumn("❌ Não", width="small"),
+                                                "❓ Talvez": st.column_config.NumberColumn("❓ Talvez", width="small"),
+                                                "⏳ Pendentes": st.column_config.NumberColumn("⏳ Pend.", width="small")
+                                            }
+                                        )
+                                        
+                                        naipes_vazios = df_naipes[df_naipes['✅ Vão'] == 0]
+                                        if not naipes_vazios.empty:
+                                            naipes_lista = naipes_vazios['Naipe'].tolist()
+                                            if naipes_lista:
+                                                st.warning(f"⚠️ **Atenção:** Os seguintes naipes não têm confirmações: {', '.join(naipes_lista)}")
+                                else:
+                                    st.info("ℹ️ Os músicos ainda não têm instrumentos definidos.")
                             else:
-                                st.info("ℹ️ Os músicos ainda não têm instrumentos definidos. Peça-lhes para preencherem essa informação no perfil.")
-                        
-                        else:
-                            st.info("Nenhum músico registado no sistema")
+                                st.info("Nenhum músico registado no sistema")
         
         except Exception as e:
             st.error(f"❌ Erro ao carregar eventos: {str(e)}")
@@ -274,9 +359,7 @@ def render(base, user):
             else:
                 df_mus = pd.DataFrame(musicos)
                 
-                # Verificar se tem a coluna Instrumento
                 if 'Instrumento' in df_mus.columns:
-                    # Estatísticas
                     col1, col2, col3 = st.columns(3)
                     
                     total_inst = df_mus['Instrumento'].notna().sum()
@@ -289,7 +372,6 @@ def render(base, user):
                     
                     st.divider()
                     
-                    # Tabela
                     colunas_mostrar = ['Nome', 'Instrumento', 'Marca', 'Modelo', 'Num Serie']
                     colunas_existentes = [c for c in colunas_mostrar if c in df_mus.columns]
                     
@@ -300,7 +382,7 @@ def render(base, user):
                             hide_index=True
                         )
                 else:
-                    st.info("ℹ️ Ainda não há dados de instrumentos. Os músicos devem preencher essa informação nos seus perfis.")
+                    st.info("ℹ️ Ainda não há dados de instrumentos.")
         
         except Exception as e:
             st.error(f"Erro: {e}")
@@ -319,7 +401,6 @@ def render(base, user):
             else:
                 df_aulas = pd.DataFrame(aulas)
                 
-                # Estatísticas
                 col1, col2 = st.columns(2)
                 
                 total_alunos = len(df_aulas)
@@ -330,7 +411,6 @@ def render(base, user):
                 
                 st.divider()
                 
-                # Tabela
                 colunas_mostrar = ['Professor', 'Aluno', 'DiaHora', 'Sala']
                 colunas_existentes = [c for c in colunas_mostrar if c in df_aulas.columns]
                 
@@ -364,7 +444,6 @@ def render(base, user):
                     tem_email = bool(m.get('Email'))
                     tem_morada = bool(m.get('Morada'))
                     
-                    # Calcular completude
                     campos_preenchidos = sum([tem_telefone, tem_email, tem_morada])
                     percentagem = int((campos_preenchidos / 3) * 100)
                     
@@ -378,7 +457,6 @@ def render(base, user):
                 
                 df_status = pd.DataFrame(status_list)
                 
-                # Métricas
                 completos = len([s for s in status_list if s["Completude"] == "100%"])
                 incompletos = len(status_list) - completos
                 
@@ -389,7 +467,6 @@ def render(base, user):
                 
                 st.divider()
                 
-                # Tabela
                 st.dataframe(
                     df_status,
                     use_container_width=True,
@@ -400,11 +477,11 @@ def render(base, user):
             st.error(f"Erro: {e}")
     
     # ========================================
-    # TAB 5: MENSAGENS (COM PODER DE APAGAR)
+    # TAB 5: MENSAGENS
     # ========================================
     with t5:
         from mensagens import render_chat
-        render_chat(base, user, pode_apagar=True)  # Direção pode apagar!
+        render_chat(base, user, pode_apagar=True)
     
     # ========================================
     # TAB 6: ANIVERSÁRIOS
@@ -418,7 +495,6 @@ def render(base, user):
             if not musicos:
                 st.info("📭 Sem dados de músicos")
             else:
-                # Calcular aniversários
                 hoje = datetime.now().date()
                 data_limite = hoje + timedelta(days=15)
                 aniversarios = []
@@ -498,9 +574,6 @@ def render(base, user):
         
         col1, col2 = st.columns(2)
         
-        # ========================================
-        # COLUNA 1: LIMPAR DUPLICADOS
-        # ========================================
         with col1:
             st.markdown("### 🧹 Limpar Duplicados")
             st.write("Remove utilizadores duplicados, mantendo a versão com password encriptada.")
@@ -519,9 +592,6 @@ def render(base, user):
                         else:
                             st.info("✨ Nenhum duplicado encontrado!")
         
-        # ========================================
-        # COLUNA 2: SINCRONIZAR NOVOS
-        # ========================================
         with col2:
             st.markdown("### 🔄 Sincronizar Músicos")
             st.write("Cria utilizadores para músicos que ainda não têm conta (password: 1234).")
@@ -542,9 +612,6 @@ def render(base, user):
         
         st.divider()
         
-        # ========================================
-        # TABELA DE UTILIZADORES
-        # ========================================
         st.markdown("### 📋 Lista de Utilizadores")
         
         try:
@@ -553,12 +620,10 @@ def render(base, user):
             if not utilizadores:
                 st.info("📭 Nenhum utilizador registado")
             else:
-                # Criar DataFrame
                 users_list = []
                 for u in utilizadores:
                     password = str(u.get('Password', ''))
                     
-                    # Verificar se password está encriptada
                     if password.startswith('$2b$'):
                         status_pass = "🔒 Encriptada"
                     elif password == "1234":
@@ -575,7 +640,6 @@ def render(base, user):
                 
                 df_users = pd.DataFrame(users_list)
                 
-                # Métricas
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Total", len(users_list))
                 
@@ -587,7 +651,6 @@ def render(base, user):
                 
                 st.divider()
                 
-                # Tabela
                 st.dataframe(
                     df_users,
                     use_container_width=True,
@@ -600,21 +663,16 @@ def render(base, user):
                     }
                 )
                 
-                # Alerta de passwords padrão
                 if padrao > 0:
-                    st.warning(f"⚠️ **Atenção:** {padrao} utilizador(es) ainda têm password padrão (1234). Peça-lhes para alterarem!")
+                    st.warning(f"⚠️ **Atenção:** {padrao} utilizador(es) ainda têm password padrão (1234).")
                 
-                # ========================================
-                # RESETAR PASSWORD (NOVO)
-                # ========================================
                 st.divider()
                 st.markdown("### 🔄 Resetar Password de Utilizador")
-                st.caption("Útil quando alguém esquece a password. A nova password será '1234' e o utilizador será obrigado a mudá-la no próximo login.")
+                st.caption("A nova password será '1234' e o utilizador será obrigado a mudá-la no próximo login.")
                 
                 col_reset1, col_reset2 = st.columns([3, 1])
                 
                 with col_reset1:
-                    # Lista de utilizadores para selecionar
                     users_nomes = [f"{u.get('Nome')} ({u.get('Username')})" for u in utilizadores]
                     user_selecionado = st.selectbox(
                         "Selecione o utilizador:",
@@ -627,12 +685,9 @@ def render(base, user):
                     if st.button("🔄 Resetar para 1234", type="secondary", use_container_width=True):
                         try:
                             user_row = utilizadores[user_selecionado]
-                            
-                            # Resetar password para "1234" (texto simples)
                             base.update_row("Utilizadores", user_row['_id'], {
                                 "Password": "1234"
                             })
-                            
                             st.success(f"✅ Password de **{user_row.get('Nome')}** resetada para '1234'!")
                             st.info("💡 O utilizador será obrigado a mudar a password no próximo login.")
                             st.rerun()
