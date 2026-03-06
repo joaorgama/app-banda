@@ -26,7 +26,6 @@ CORES_PROFESSORES = [
 # ============================================
 
 def _sv(val):
-    """Normaliza qualquer valor SeaTable para string limpa."""
     if val is None:
         return ''
     if isinstance(val, bool):
@@ -44,7 +43,6 @@ def _sv(val):
 
 
 def _hora_norm(val):
-    """Normaliza hora para HH:MM."""
     s = _sv(val).strip().upper().replace('H', ':')
     if ':' in s:
         partes = s.split(':')
@@ -66,7 +64,6 @@ def _normalizar_recorrente(val):
 
 
 def _card_styles():
-    """Devolve (bg, color) adaptados ao tema atual."""
     dark = st.session_state.get('dark_mode', True)
     return ('#2a2a2a', '#f5f5f5') if dark else ('#fafafa', '#1a1a1a')
 
@@ -177,7 +174,6 @@ def _render_calendario(df_aulas):
     cores_prof = {p: CORES_PROFESSORES[i % len(CORES_PROFESSORES)] for i, p in enumerate(profs_todos)}
     aulas_por_dia = _get_aulas_do_mes(df_fil, ano, mes)
 
-    # Calendário HTML — cores adaptadas ao tema
     cal_bg      = '#1e1e1e' if dark else '#ffffff'
     cal_border  = '#444'    if dark else '#ddd'
     cal_vazio   = '#2a2a2a' if dark else '#f5f5f5'
@@ -276,12 +272,15 @@ def render(base, user):
     st.title("👨‍🏫 Área do Professor")
     st.caption(f"Bem-vindo(a), **{user['display_name']}**")
 
-    dark = st.session_state.get('dark_mode', True)
     card_bg, card_color = _card_styles()
 
-    t1, t2, t3, t4 = st.tabs([
-        "📚 Os Meus Alunos", "➕ Adicionar Aluno",
-        "📆 Aula Extra",     "📅 Calendário"
+    # ← 5 tabs agora, com Reportório no fim
+    t1, t2, t3, t4, t5 = st.tabs([
+        "📚 Os Meus Alunos",
+        "➕ Adicionar Aluno",
+        "📆 Aula Extra",
+        "📅 Calendário",
+        "🎼 Reportório",
     ])
 
     try:
@@ -592,3 +591,37 @@ def render(base, user):
     with t4:
         st.subheader("📅 Calendário de Aulas")
         _render_calendario(df_aulas_todas)
+
+    # ========================================
+    # TAB 5: REPORTÓRIO
+    # ========================================
+    with t5:
+        st.subheader("🎼 Reportório da Banda")
+
+        try:
+            repertorio = base.list_rows("Repertorio")
+
+            if not repertorio:
+                st.info("📭 Nenhuma obra no reportório atual")
+            else:
+                search = st.text_input("🔍 Pesquisar obra ou compositor", "", key="prof_rep_search")
+
+                for r in repertorio:
+                    nome_obra  = r.get('Nome da Obra', 'S/ Nome')
+                    compositor = r.get('Compositor', '---')
+
+                    if search.lower() in nome_obra.lower() or search.lower() in compositor.lower() or not search:
+                        with st.expander(f"🎼 {nome_obra}"):
+                            st.write(f"**Compositor:** {compositor}")
+
+                            link = r.get('Links', '')
+                            if link:
+                                if "youtube" in link.lower() or "youtu.be" in link.lower():
+                                    st.video(link)
+                                else:
+                                    st.link_button("🔗 Abrir Partitura", link, use_container_width=True)
+                            else:
+                                st.info("Sem partitura disponível")
+
+        except Exception as e:
+            st.error(f"Erro ao carregar reportório: {e}")
