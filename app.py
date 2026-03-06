@@ -25,11 +25,7 @@ st.set_page_config(
     page_icon="🎵",
     layout="wide",
     initial_sidebar_state="expanded",
-    menu_items={
-        'Get Help': None,
-        'Report a bug': None,
-        'About': None
-    }
+    menu_items={'Get Help': None, 'Report a bug': None, 'About': None}
 )
 
 # ============================================
@@ -56,12 +52,6 @@ st.markdown("""
             padding: 2rem 0;
             color: #ff6b35;
         }
-        .btn-tema-fixo {
-            position: fixed;
-            top: 0.6rem;
-            right: 1rem;
-            z-index: 9999;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -79,8 +69,15 @@ def aplicar_tema_css(dark):
             .stMarkdown, p, span, label, div { color: #f5f5f5; }
             h1, h2, h3, h4 { color: #f5f5f5 !important; }
 
-            /* ✅ CORREÇÃO: texto branco nos botões em modo escuro */
-            .stButton > button { color: #f5f5f5 !important; }
+            .stButton > button {
+                background-color: #2d2d2d !important;
+                color: #f5f5f5 !important;
+                border: 1px solid #555 !important;
+            }
+            .stButton > button:hover {
+                background-color: #3d3d3d !important;
+                border-color: #ff6b35 !important;
+            }
             .stButton > button p { color: #f5f5f5 !important; }
 
             .stTextInput > div > div > input,
@@ -106,8 +103,15 @@ def aplicar_tema_css(dark):
             .stMarkdown, p, span, label, div { color: #000000; }
             h1, h2, h3, h4 { color: #000000 !important; }
 
-            /* Texto preto nos botões em modo claro */
-            .stButton > button { color: #000000 !important; }
+            .stButton > button {
+                background-color: #f0f2f6 !important;
+                color: #000000 !important;
+                border: 1px solid #cccccc !important;
+            }
+            .stButton > button:hover {
+                background-color: #e0e2e6 !important;
+                border-color: #ff6b35 !important;
+            }
             .stButton > button p { color: #000000 !important; }
 
             .stTextInput > div > div > input,
@@ -153,7 +157,7 @@ if not base:
 aplicar_tema_css(st.session_state.get('dark_mode', True))
 
 # ============================================
-# BOTÃO TEMA — TOPO DA PÁGINA (SEMPRE VISÍVEL)
+# BOTÃO TEMA — TOPO DA PÁGINA
 # ============================================
 
 tema_atual = st.session_state.get('dark_mode', True)
@@ -174,7 +178,7 @@ with col_tema:
         st.rerun()
 
 # ============================================
-# SIDEBAR — SEMPRE VISÍVEL (LOGIN E AUTENTICADO)
+# SIDEBAR
 # ============================================
 
 with st.sidebar:
@@ -209,34 +213,33 @@ with st.sidebar:
 
 if st.session_state['auth_status'] and st.session_state['must_change_pass']:
     st.warning("⚠️ **ATENÇÃO:** Está a usar a password padrão. Por razões de segurança, deve alterá-la.")
-    
+
     user = st.session_state['user_info']
-    
     st.title("🔒 Alterar Password")
     st.write(f"Olá **{user['display_name']}**, bem-vindo(a) ao Portal BMO!")
     st.info("Por favor, defina uma nova password antes de continuar.")
-    
+
     with st.form("change_password"):
-        new_pass = st.text_input("🔑 Nova Password", type="password", help="Mínimo 4 caracteres")
+        new_pass     = st.text_input("🔑 Nova Password", type="password", help="Mínimo 4 caracteres")
         confirm_pass = st.text_input("🔑 Confirmar Password", type="password")
-        
+
         if st.form_submit_button("💾 Guardar Nova Password", use_container_width=True):
             if len(new_pass) < 4:
                 st.error("❌ A password deve ter pelo menos 4 caracteres")
             elif new_pass != confirm_pass:
                 st.error("❌ As passwords não coincidem")
-            elif new_pass == DEFAULT_PASS or new_pass == "1234":
+            elif new_pass in (DEFAULT_PASS, "1234"):
                 st.error("❌ Não pode usar a password padrão '1234'")
             else:
                 try:
-                    nova_password_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-                    base.update_row("Utilizadores", user['row_id'], {"Password": nova_password_hash})
+                    nova_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    base.update_row("Utilizadores", user['row_id'], {"Password": nova_hash})
                     st.session_state['must_change_pass'] = False
                     st.success("✅ Password alterada com sucesso!")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Erro ao alterar password: {e}")
-    
+
     st.stop()
 
 # ============================================
@@ -245,44 +248,38 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
 
 if not st.session_state['auth_status']:
     st.markdown('<h1 class="login-header">🎵 Banda Municipal de Oeiras</h1>', unsafe_allow_html=True)
-    
+
     col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
         with st.form("login_form", clear_on_submit=False):
             st.subheader("Entrar no Portal")
-            
             u_in = st.text_input("👤 Utilizador", placeholder="Introduza o seu username").strip().lower()
             p_in = st.text_input("🔒 Password", type="password", placeholder="Introduza a sua password").strip()
-            
-            submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
-            
-            if submit:
+
+            if st.form_submit_button("🚀 Entrar", use_container_width=True):
                 if not u_in or not p_in:
                     st.error("⚠️ Preencha todos os campos")
                 else:
                     try:
                         users_list = base.list_rows("Utilizadores")
                         df_users = pd.DataFrame(users_list) if users_list else pd.DataFrame()
-                        
+
                         if df_users.empty:
                             st.error("❌ Erro ao carregar utilizadores da base de dados")
                         else:
                             match = df_users[df_users['Username'].str.lower() == u_in]
-                            
                             if match.empty:
                                 st.error("❌ Utilizador não encontrado")
                             else:
                                 row = match.iloc[0]
                                 stored_pass = str(row.get('Password', ''))
-                                
                                 password_correta = False
-                                precisa_trocar = False
-                                
+                                precisa_trocar   = False
+
                                 if stored_pass == "1234":
                                     if p_in == "1234":
                                         password_correta = True
-                                        precisa_trocar = True
+                                        precisa_trocar   = True
                                 elif stored_pass.startswith('$2b$'):
                                     try:
                                         if bcrypt.checkpw(p_in.encode('utf-8'), stored_pass.encode('utf-8')):
@@ -290,30 +287,28 @@ if not st.session_state['auth_status']:
                                     except Exception:
                                         password_correta = False
                                 else:
-                                    if p_in == stored_pass:
-                                        password_correta = True
-                                
+                                    password_correta = (p_in == stored_pass)
+
                                 if password_correta:
                                     tema_guardado = str(row.get('Tema', 'dark')).strip().lower()
                                     if tema_guardado not in ['dark', 'light']:
                                         tema_guardado = 'dark'
-                                    
+
                                     st.session_state.update({
-                                        'auth_status': True,
+                                        'auth_status':      True,
                                         'must_change_pass': precisa_trocar,
-                                        'dark_mode': tema_guardado == 'dark',
+                                        'dark_mode':        tema_guardado == 'dark',
                                         'user_info': {
-                                            'username': u_in,
+                                            'username':     u_in,
                                             'display_name': row.get('Nome', u_in),
-                                            'role': row.get('Funcao', 'Musico'),
-                                            'row_id': row['_id']
+                                            'role':         row.get('Funcao', 'Musico'),
+                                            'row_id':       row['_id']
                                         }
                                     })
                                     st.success(f"✅ Bem-vindo(a), {row.get('Nome', u_in)}!")
                                     st.rerun()
                                 else:
                                     st.error("❌ Password incorreta")
-                    
                     except Exception as e:
                         st.error(f"❌ Erro ao fazer login: {str(e)}")
                         st.info("💡 Verifique se a tabela 'Utilizadores' existe no SeaTable")
@@ -324,7 +319,6 @@ if not st.session_state['auth_status']:
 
 else:
     user = st.session_state['user_info']
-    
     try:
         if user['role'] == "Musico":
             musico.render(base, user)
@@ -339,7 +333,6 @@ else:
             st.info("Roles válidos: Musico, Professor, Maestro, Direcao")
             if st.button("🔄 Tentar novamente"):
                 st.rerun()
-    
     except Exception as e:
         st.error(f"❌ Erro ao carregar a página: {str(e)}")
         st.exception(e)
@@ -352,8 +345,7 @@ else:
 
 st.markdown("---")
 st.markdown(
-    "<p style='text-align: center; color: gray; font-size: 0.8rem;'>"
-    "© 2026 Banda Municipal de Oeiras"
-    "</p>",
+    "<p style='text-align:center;color:gray;font-size:0.8rem;'>"
+    "© 2026 Banda Municipal de Oeiras</p>",
     unsafe_allow_html=True
 )
