@@ -5,7 +5,6 @@ import streamlit as st
 import pandas as pd
 import calendar
 from datetime import datetime, date
-import unicodedata
 
 # ============================================
 # CONSTANTES
@@ -45,7 +44,7 @@ def _sv(val):
 
 
 def _hora_norm(val):
-    """Normaliza hora para HH:MM. Trata '16:00', '16h00', '16:0', '16:00:00'."""
+    """Normaliza hora para HH:MM."""
     s = _sv(val).strip().upper().replace('H', ':')
     if ':' in s:
         partes = s.split(':')
@@ -64,6 +63,12 @@ def _normalizar_recorrente(val):
     if isinstance(val, dict):
         val = val.get('name', val.get('value', False))
     return str(val).lower() in ['true', '1', 'yes', 'sim']
+
+
+def _card_styles():
+    """Devolve (bg, color) adaptados ao tema atual."""
+    dark = st.session_state.get('dark_mode', True)
+    return ('#2a2a2a', '#f5f5f5') if dark else ('#fafafa', '#1a1a1a')
 
 
 # ============================================
@@ -116,6 +121,9 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
 
 def _render_calendario(df_aulas):
     hoje = date.today()
+    dark = st.session_state.get('dark_mode', True)
+    card_bg, card_color = _card_styles()
+
     if 'cal_ano' not in st.session_state:
         st.session_state['cal_ano'] = hoje.year
     if 'cal_mes' not in st.session_state:
@@ -169,19 +177,27 @@ def _render_calendario(df_aulas):
     cores_prof = {p: CORES_PROFESSORES[i % len(CORES_PROFESSORES)] for i, p in enumerate(profs_todos)}
     aulas_por_dia = _get_aulas_do_mes(df_fil, ano, mes)
 
-    css = """<style>
-    .bmo-cal{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px}
-    .bmo-cal th{background:#ff6b35;color:#fff;padding:8px 4px;text-align:center;font-weight:bold;font-size:.82rem}
-    .bmo-cal td{border:1px solid #ddd;padding:4px;vertical-align:top;height:100px;width:14.28%;font-size:.75rem;background:#fff}
-    .bmo-cal td.vazio{background:#f5f5f5}
-    .bmo-cal td.e-hoje{background:#fff8f5;border:2px solid #ff6b35!important}
-    .bmo-cal td.fim-semana{background:#fafafa}
-    .cal-num{font-weight:bold;font-size:.88rem;color:#555;margin-bottom:2px}
-    .cal-num-hoje{color:#ff6b35;font-size:.95rem;font-weight:bold}
-    .aula-pill{display:block;padding:2px 5px;margin:1px 0;border-radius:4px;font-size:.66rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .bmo-legenda{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 4px}
-    .bmo-leg-item{display:flex;align-items:center;gap:5px;font-size:.8rem}
-    .bmo-leg-dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex-shrink:0}
+    # Calendário HTML — cores adaptadas ao tema
+    cal_bg      = '#1e1e1e' if dark else '#ffffff'
+    cal_border  = '#444'    if dark else '#ddd'
+    cal_vazio   = '#2a2a2a' if dark else '#f5f5f5'
+    cal_fds     = '#252525' if dark else '#fafafa'
+    cal_hoje_bg = '#2d1a0e' if dark else '#fff8f5'
+    num_color   = '#aaa'    if dark else '#555'
+
+    css = f"""<style>
+    .bmo-cal{{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px}}
+    .bmo-cal th{{background:#ff6b35;color:#fff;padding:8px 4px;text-align:center;font-weight:bold;font-size:.82rem}}
+    .bmo-cal td{{border:1px solid {cal_border};padding:4px;vertical-align:top;height:100px;width:14.28%;font-size:.75rem;background:{cal_bg}}}
+    .bmo-cal td.vazio{{background:{cal_vazio}}}
+    .bmo-cal td.e-hoje{{background:{cal_hoje_bg};border:2px solid #ff6b35!important}}
+    .bmo-cal td.fim-semana{{background:{cal_fds}}}
+    .cal-num{{font-weight:bold;font-size:.88rem;color:{num_color};margin-bottom:2px}}
+    .cal-num-hoje{{color:#ff6b35;font-size:.95rem;font-weight:bold}}
+    .aula-pill{{display:block;padding:2px 5px;margin:1px 0;border-radius:4px;font-size:.66rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+    .bmo-legenda{{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 4px}}
+    .bmo-leg-item{{display:flex;align-items:center;gap:5px;font-size:.8rem}}
+    .bmo-leg-dot{{width:11px;height:11px;border-radius:50%;display:inline-block;flex-shrink:0}}
     </style>"""
 
     leg_html = '<div class="bmo-legenda">' + ''.join(
@@ -199,7 +215,7 @@ def _render_calendario(df_aulas):
             if dia == 0:
                 html += '<td class="vazio"></td>'
             else:
-                is_hoje = date(ano, mes, dia) == hoje
+                is_hoje  = date(ano, mes, dia) == hoje
                 td_class = 'e-hoje' if is_hoje else ('fim-semana' if idx >= 5 else '')
                 html += f'<td class="{td_class}"><div class="{"cal-num-hoje" if is_hoje else "cal-num"}">{dia}</div>'
                 if dia in aulas_por_dia:
@@ -209,14 +225,12 @@ def _render_calendario(df_aulas):
                         hora  = _hora_norm(aula.get('Hora', ''))
                         local = _sv(aula.get('Local', ''))
                         cor   = cores_prof.get(prof, '#888888')
-                        # ✅ Pill: HH:MM NomeAluno - Local
                         label   = f"{hora} {aluno[:10]} - {local}"
                         tooltip = f"{hora} | {aluno} | {prof} | {local}"
                         html += (f'<span class="aula-pill" style="background:{cor}" '
                                  f'title="{tooltip}">{label}</span>')
                 html += '</td>'
         html += '</tr>'
-
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
@@ -245,7 +259,7 @@ def _render_calendario(df_aulas):
                 rec_str = "🔁" if _normalizar_recorrente(aula.get('Recorrente', False)) else "📌"
                 st.markdown(
                     f"<div style='border-left:4px solid {cor};padding:6px 10px;margin:4px 0;"
-                    f"background:#fafafa;border-radius:0 6px 6px 0'>"
+                    f"background:{card_bg};border-radius:0 6px 6px 0;color:{card_color};'>"
                     f"{rec_str} 🕐 <b>{_hora_norm(aula.get('Hora','---'))}</b> &nbsp;|&nbsp; "
                     f"👤 {_sv(aula.get('Aluno','---')) or '---'} &nbsp;|&nbsp; "
                     f"👨‍🏫 {prof} &nbsp;|&nbsp; "
@@ -261,6 +275,9 @@ def _render_calendario(df_aulas):
 def render(base, user):
     st.title("👨‍🏫 Área do Professor")
     st.caption(f"Bem-vindo(a), **{user['display_name']}**")
+
+    dark = st.session_state.get('dark_mode', True)
+    card_bg, card_color = _card_styles()
 
     t1, t2, t3, t4 = st.tabs([
         "📚 Os Meus Alunos", "➕ Adicionar Aluno",
@@ -358,10 +375,10 @@ def render(base, user):
                                     try:
                                         base.update_row("Aulas", row_id, {
                                             "Dia da Semana": novo_dia,
-                                            "Hora": _hora_norm(nova_hora),
-                                            "Local": novo_local,
-                                            "Sala": nova_sala.strip(),
-                                            "Data Inicio": str(nova_di),
+                                            "Hora":          _hora_norm(nova_hora),
+                                            "Local":         novo_local,
+                                            "Sala":          nova_sala.strip(),
+                                            "Data Inicio":   str(nova_di),
                                         })
                                         st.session_state[edit_key] = False
                                         st.success("✅ Aula atualizada!")
@@ -464,8 +481,8 @@ def render(base, user):
                     st.markdown("#### 📅 Dados da Aula Recorrente")
                     f1, f2 = st.columns(2)
                     with f1:
-                        dias_semana = ["","Segunda-Feira","Terça-Feira","Quarta-Feira",
-                                       "Quinta-Feira","Sexta-Feira","Sábado","Domingo"]
+                        dias_semana     = ["","Segunda-Feira","Terça-Feira","Quarta-Feira",
+                                           "Quinta-Feira","Sexta-Feira","Sábado","Domingo"]
                         dia_escolhido   = st.selectbox("Dia da Semana*", options=dias_semana)
                         hora_aula       = st.text_input("Hora*", placeholder="Ex: 16:00")
                         data_inicio_rec = st.date_input("Data de Início*", value=date.today())
@@ -484,11 +501,15 @@ def render(base, user):
                             mc = df_alunos[df_alunos['Nome'].apply(_sv) == aluno_escolhido]
                             contacto_aluno = _sv(mc.iloc[0].get('Telefone','')) if not mc.empty else ""
                             nova_aula = {
-                                "Professor": user['display_name'], "Aluno": aluno_escolhido,
-                                "Hora": hora_norm_input, "Sala": sala_aula.strip(),
-                                "Contacto": contacto_aluno, "Local": local_escolhido,
-                                "Dia da Semana": dia_escolhido, "Recorrente": True,
-                                "Data Inicio": str(data_inicio_rec),
+                                "Professor":     user['display_name'],
+                                "Aluno":         aluno_escolhido,
+                                "Hora":          hora_norm_input,
+                                "Sala":          sala_aula.strip(),
+                                "Contacto":      contacto_aluno,
+                                "Local":         local_escolhido,
+                                "Dia da Semana": dia_escolhido,
+                                "Recorrente":    True,
+                                "Data Inicio":   str(data_inicio_rec),
                             }
                             try:
                                 base.append_row("Aulas", nova_aula)
@@ -545,11 +566,16 @@ def render(base, user):
                             if not df_alunos.empty else pd.DataFrame()
                         contacto_extra = _sv(mx.iloc[0].get('Telefone','')) if not mx.empty else ""
                         nova_aula_extra = {
-                            "Professor": user['display_name'], "Aluno": aluno_extra,
-                            "Hora": hora_norm_extra, "Sala": sala_extra.strip(),
-                            "Contacto": contacto_extra, "Local": local_extra,
-                            "Dia da Semana": "", "Recorrente": False,
-                            "Data Aula": str(data_extra), "Data Inicio": str(data_extra),
+                            "Professor":     user['display_name'],
+                            "Aluno":         aluno_extra,
+                            "Hora":          hora_norm_extra,
+                            "Sala":          sala_extra.strip(),
+                            "Contacto":      contacto_extra,
+                            "Local":         local_extra,
+                            "Dia da Semana": "",
+                            "Recorrente":    False,
+                            "Data Aula":     str(data_extra),
+                            "Data Inicio":   str(data_extra),
                         }
                         try:
                             base.append_row("Aulas", nova_aula_extra)
