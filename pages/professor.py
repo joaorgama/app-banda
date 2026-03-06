@@ -21,18 +21,10 @@ CORES_PROFESSORES = [
     "#ff6b35", "#4ecdc4", "#45b7d1", "#96ceb4",
     "#dda0dd", "#f39c12", "#bb8fce", "#85c1e9", "#58d68d", "#ec7063"
 ]
-LOCAL_MAP = {"oeiras": 1, "alges": 2, "algés": 2, "outro": 3}
 
 # ============================================
 # HELPERS
 # ============================================
-
-def _strip_accents(s):
-    """Remove acentos para comparação robusta: 'Algés' == 'Alges'"""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
-    )
 
 def _sv(val):
     """Normaliza qualquer valor SeaTable para string limpa."""
@@ -51,25 +43,6 @@ def _sv(val):
         return str(item).strip()
     return str(val).strip()
 
-def _local_key(val):
-    """
-    Normaliza local para chave comparável:
-    remove acentos, lowercase, strip.
-    'Algés' / 'Alges' / 'ALGÉS' → 'alges'
-    """
-    return _strip_accents(_sv(val).lower().strip())
-
-def _locais_coincidem(local_a, local_b):
-    """
-    Compara dois locais de forma robusta.
-    Usa ID numérico se ambos reconhecidos, senão compara string normalizada.
-    """
-    ka = _local_key(local_a)
-    kb = _local_key(local_b)
-    if not ka or not kb:
-        return False  # local vazio/desconhecido → não conflict
-    # Comparação direta após normalização (sem acentos, lowercase)
-    return ka == kb
 
 def _hora_norm(val):
     """Normaliza hora para HH:MM. Trata '16:00', '16h00', '16:0', '16:00:00'."""
@@ -82,6 +55,7 @@ def _hora_norm(val):
             pass
     return s
 
+
 def _normalizar_recorrente(val):
     if isinstance(val, bool):
         return val
@@ -93,63 +67,7 @@ def _normalizar_recorrente(val):
 
 
 # ============================================
-# DIAGNÓSTICO (ativa com ?debug=1 na URL ou botão)
-# ============================================
-
-def _render_diagnostico(df_aulas):
-    """Mostra valores raw e normalizados das aulas — para perceber o formato do SeaTable."""
-    if df_aulas.empty:
-        st.info("Sem aulas para analisar.")
-        return
-
-    st.markdown("#### 🔬 Valores RAW vs Normalizados (primeiras 10 aulas)")
-    rows = []
-    for _, aula in df_aulas.head(10).iterrows():
-        hora_raw  = aula.get('Hora', 'N/A')
-        local_raw = aula.get('Local', 'N/A')
-        dia_raw   = aula.get('Dia da Semana', 'N/A')
-        rec_raw   = aula.get('Recorrente', 'N/A')
-        rows.append({
-            'Aluno':       _sv(aula.get('Aluno', '?')),
-            'Hora RAW':    repr(hora_raw),
-            'Hora NORM':   _hora_norm(hora_raw),
-            'Local RAW':   repr(local_raw),
-            'Local KEY':   _local_key(local_raw),
-            'Dia RAW':     repr(dia_raw),
-            'Dia NORM':    _sv(dia_raw),
-            'Rec RAW':     repr(rec_raw),
-            'Rec BOOL':    str(_normalizar_recorrente(rec_raw)),
-        })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
-
-    # ---- Mostrar conflitos existentes ----
-    st.markdown("#### ⚠️ Pares com mesmo horário + local (conflitos actuais)")
-    conflitos_encontrados = []
-    aulas_list = list(df_aulas.iterrows())
-    for i, (_, a1) in enumerate(aulas_list):
-        for _, a2 in aulas_list[i+1:]:
-            if _hora_norm(a1.get('Hora','')) == _hora_norm(a2.get('Hora','')) and \
-               _locais_coincidem(a1.get('Local',''), a2.get('Local','')):
-                conflitos_encontrados.append({
-                    'Aluno 1': _sv(a1.get('Aluno','')),
-                    'Prof 1':  _sv(a1.get('Professor','')),
-                    'Aluno 2': _sv(a2.get('Aluno','')),
-                    'Prof 2':  _sv(a2.get('Professor','')),
-                    'Hora':    _hora_norm(a1.get('Hora','')),
-                    'Local A': repr(a1.get('Local','')),
-                    'Local B': repr(a2.get('Local','')),
-                    'Local KEY A': _local_key(a1.get('Local','')),
-                    'Local KEY B': _local_key(a2.get('Local','')),
-                })
-    if conflitos_encontrados:
-        st.error(f"⚠️ {len(conflitos_encontrados)} par(es) com horário/local sobrepostos!")
-        st.dataframe(pd.DataFrame(conflitos_encontrados), use_container_width=True)
-    else:
-        st.success("✅ Nenhum conflito detectado nos dados actuais.")
-
-
-# ============================================
-# LÓGICA CALENDÁRIO
+# CALENDÁRIO
 # ============================================
 
 def _get_aulas_do_mes(df_aulas, ano, mes):
@@ -195,123 +113,6 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
             aulas_por_dia[dia] = aulas_do_dia
     return aulas_por_dia
 
-
-# ============================================
-# VERIFICAÇÃO DE CONFLITOS — versão definitiva
-# ============================================
-
-def _verificar_conflitos(df_aulas, hora, local, dia_semana, data_especifica, recorrente):
-    """
-    Compara hora (normalizada HH:MM) e local (sem acentos, lowercase).
-    Sem retornos antecipados silenciosos — todos os caminhos são verificados.
-    """
-    conflitos = []
-    if df_aulas.empty:
-        return conflitos
-
-    hora_nova  = _hora_norm(hora)
-    local_nova = _sv(local)
-
-    if not hora_nova:
-        return conflitos
-
-    for _, aula in df_aulas.iterrows():
-        # ── HORA ──────────────────────────────────────────
-        aula_hora = _hora_norm(aula.get('Hora', ''))
-        if not aula_hora or aula_hora != hora_nova:
-            continue
-
-        # ── LOCAL ─────────────────────────────────────────
-        # _locais_coincidem usa strip_accents + lowercase → robusto
-        if not _locais_coincidem(aula.get('Local', ''), local_nova):
-            continue
-
-        # ── DIAS / DATAS ───────────────────────────────────
-        aula_recorrente = _normalizar_recorrente(aula.get('Recorrente', False))
-        aula_dia        = _sv(aula.get('Dia da Semana', ''))
-        aula_local_disp = _sv(aula.get('Local', '')) or '---'
-        prof_  = _sv(aula.get('Professor', '')) or '---'
-        aluno_ = _sv(aula.get('Aluno', ''))     or '---'
-
-        if recorrente and dia_semana:
-            if aula_recorrente:
-                if aula_dia == dia_semana:
-                    conflitos.append({'professor': prof_, 'aluno': aluno_,
-                                      'tipo': f"Recorrente ({aula_dia})",
-                                      'hora': aula_hora, 'local': aula_local_disp})
-            else:
-                data_raw = _sv(aula.get('Data Aula', ''))
-                if data_raw and dia_semana in DIAS_PT_MAP:
-                    try:
-                        d = datetime.strptime(data_raw[:10], '%Y-%m-%d').date()
-                        if d.weekday() == DIAS_PT_MAP[dia_semana]:
-                            conflitos.append({'professor': prof_, 'aluno': aluno_,
-                                              'tipo': f"Data específica {data_raw[:10]}",
-                                              'hora': aula_hora, 'local': aula_local_disp})
-                    except Exception:
-                        pass
-
-        elif not recorrente and data_especifica:
-            weekday_nova = data_especifica.weekday()
-            if aula_recorrente:
-                if aula_dia in DIAS_PT_MAP and DIAS_PT_MAP[aula_dia] == weekday_nova:
-                    conflitos.append({'professor': prof_, 'aluno': aluno_,
-                                      'tipo': f"Recorrente ({aula_dia})",
-                                      'hora': aula_hora, 'local': aula_local_disp})
-            else:
-                data_raw = _sv(aula.get('Data Aula', ''))
-                if data_raw[:10] == str(data_especifica)[:10]:
-                    conflitos.append({'professor': prof_, 'aluno': aluno_,
-                                      'tipo': f"Data específica {data_raw[:10]}",
-                                      'hora': aula_hora, 'local': aula_local_disp})
-
-    return conflitos
-
-
-# ============================================
-# BLOCO DE CONFLITO
-# ============================================
-
-def _render_bloco_conflito(base):
-    if not st.session_state.get('conflito_pendente', False):
-        return False
-    nova_aula = st.session_state.get('aula_pendente', {})
-    conflitos = st.session_state.get('conflitos_info', [])
-    st.error("⚠️ **Conflito de horário detectado!**")
-    st.markdown("As seguintes aulas já existem neste horário e local:")
-    for c in conflitos:
-        st.markdown(
-            f"- 🕐 **{c['hora']}** | 📍 **{c['local']}** | "
-            f"👨‍🏫 {c['professor']} | 👤 {c['aluno']} | 📆 {c['tipo']}"
-        )
-    st.warning("Podes ter aulas sobrepostas — tens a certeza que queres continuar?")
-    col_sim, col_nao = st.columns(2)
-    with col_sim:
-        if st.button("✅ Sim, confirmar mesmo assim", type="primary",
-                     use_container_width=True, key="conflito_sim"):
-            try:
-                base.append_row("Aulas", nova_aula)
-                st.session_state['conflito_pendente'] = False
-                st.session_state.pop('aula_pendente', None)
-                st.session_state.pop('conflitos_info', None)
-                st.success(f"✅ **{nova_aula.get('Aluno')}** adicionado com sucesso!")
-                st.balloons()
-                st.rerun()
-            except Exception as e_save:
-                st.error(f"❌ Erro ao guardar: {e_save}")
-    with col_nao:
-        if st.button("❌ Cancelar e escolher outro horário",
-                     use_container_width=True, key="conflito_nao"):
-            st.session_state['conflito_pendente'] = False
-            st.session_state.pop('aula_pendente', None)
-            st.session_state.pop('conflitos_info', None)
-            st.rerun()
-    return True
-
-
-# ============================================
-# CALENDÁRIO
-# ============================================
 
 def _render_calendario(df_aulas):
     hoje = date.today()
@@ -371,16 +172,18 @@ def _render_calendario(df_aulas):
     css = """<style>
     .bmo-cal{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:8px}
     .bmo-cal th{background:#ff6b35;color:#fff;padding:8px 4px;text-align:center;font-weight:bold;font-size:.82rem}
-    .bmo-cal td{border:1px solid #ddd;padding:4px;vertical-align:top;height:90px;width:14.28%;font-size:.75rem;background:#fff}
-    .bmo-cal td.vazio{background:#f5f5f5}.bmo-cal td.e-hoje{background:#fff8f5;border:2px solid #ff6b35!important}
+    .bmo-cal td{border:1px solid #ddd;padding:4px;vertical-align:top;height:100px;width:14.28%;font-size:.75rem;background:#fff}
+    .bmo-cal td.vazio{background:#f5f5f5}
+    .bmo-cal td.e-hoje{background:#fff8f5;border:2px solid #ff6b35!important}
     .bmo-cal td.fim-semana{background:#fafafa}
     .cal-num{font-weight:bold;font-size:.88rem;color:#555;margin-bottom:2px}
     .cal-num-hoje{color:#ff6b35;font-size:.95rem;font-weight:bold}
-    .aula-pill{display:block;padding:2px 5px;margin:1px 0;border-radius:4px;font-size:.68rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .aula-pill{display:block;padding:2px 5px;margin:1px 0;border-radius:4px;font-size:.66rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .bmo-legenda{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 4px}
     .bmo-leg-item{display:flex;align-items:center;gap:5px;font-size:.8rem}
     .bmo-leg-dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex-shrink:0}
     </style>"""
+
     leg_html = '<div class="bmo-legenda">' + ''.join(
         f'<div class="bmo-leg-item"><span class="bmo-leg-dot" style="background:{cor}"></span>{prof}</div>'
         for prof, cor in cores_prof.items()) + '</div>'
@@ -389,6 +192,7 @@ def _render_calendario(df_aulas):
     for d in ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"]:
         html += f'<th>{d}</th>'
     html += '</tr></thead><tbody>'
+
     for semana in calendar.monthcalendar(ano, mes):
         html += '<tr>'
         for idx, dia in enumerate(semana):
@@ -400,16 +204,19 @@ def _render_calendario(df_aulas):
                 html += f'<td class="{td_class}"><div class="{"cal-num-hoje" if is_hoje else "cal-num"}">{dia}</div>'
                 if dia in aulas_por_dia:
                     for aula in sorted(aulas_por_dia[dia], key=lambda a: _hora_norm(a.get('Hora',''))):
-                        prof  = _sv(aula.get('Professor',''))
-                        aluno = _sv(aula.get('Aluno',''))
-                        hora  = _hora_norm(aula.get('Hora',''))
-                        local = _sv(aula.get('Local',''))
+                        prof  = _sv(aula.get('Professor', ''))
+                        aluno = _sv(aula.get('Aluno', ''))
+                        hora  = _hora_norm(aula.get('Hora', ''))
+                        local = _sv(aula.get('Local', ''))
                         cor   = cores_prof.get(prof, '#888888')
+                        # ✅ Pill: HH:MM NomeAluno - Local
+                        label   = f"{hora} {aluno[:10]} - {local}"
+                        tooltip = f"{hora} | {aluno} | {prof} | {local}"
                         html += (f'<span class="aula-pill" style="background:{cor}" '
-                                 f'title="{hora} | {aluno} | {prof} | {local}">'
-                                 f'{hora} {aluno[:12]}</span>')
+                                 f'title="{tooltip}">{label}</span>')
                 html += '</td>'
         html += '</tr>'
+
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
@@ -445,11 +252,6 @@ def _render_calendario(df_aulas):
                     f"📍 {_sv(aula.get('Local','---')) or '---'} &nbsp;|&nbsp; "
                     f"🏫 {_sv(aula.get('Sala','---')) or '---'}"
                     f"</div>", unsafe_allow_html=True)
-
-    # ---- DIAGNÓSTICO (toggle) ----
-    st.divider()
-    with st.expander("🔧 Diagnóstico de conflitos (para administrador)", expanded=False):
-        _render_diagnostico(df_aulas)
 
 
 # ============================================
@@ -501,10 +303,10 @@ def render(base, user):
             st.divider()
 
             for _, aula in minhas_aulas.iterrows():
-                nome_aluno  = _sv(aula.get('Aluno',''))   or 'Sem nome'
-                hora        = _hora_norm(aula.get('Hora','')) or '---'
-                sala        = _sv(aula.get('Sala',''))    or '---'
-                local       = _sv(aula.get('Local',''))   or '---'
+                nome_aluno  = _sv(aula.get('Aluno',''))        or 'Sem nome'
+                hora        = _hora_norm(aula.get('Hora',''))  or '---'
+                sala        = _sv(aula.get('Sala',''))         or '---'
+                local       = _sv(aula.get('Local',''))        or '---'
                 dia         = _sv(aula.get('Dia da Semana',''))
                 recorrente  = _normalizar_recorrente(aula.get('Recorrente', False))
                 data_aula   = _sv(aula.get('Data Aula',''))
@@ -555,8 +357,10 @@ def render(base, user):
                                 else:
                                     try:
                                         base.update_row("Aulas", row_id, {
-                                            "Dia da Semana": novo_dia, "Hora": _hora_norm(nova_hora),
-                                            "Local": novo_local, "Sala": nova_sala.strip(),
+                                            "Dia da Semana": novo_dia,
+                                            "Hora": _hora_norm(nova_hora),
+                                            "Local": novo_local,
+                                            "Sala": nova_sala.strip(),
                                             "Data Inicio": str(nova_di),
                                         })
                                         st.session_state[edit_key] = False
@@ -634,9 +438,6 @@ def render(base, user):
                 f"**{len(ja_atribuidos_lista)}** com aula recorrente · "
                 f"**{len(disponiveis)}** disponíveis")
 
-        if _render_bloco_conflito(base):
-            st.stop()
-
         if not disponiveis:
             st.success("✅ Todos os alunos já têm aula recorrente contigo!")
         else:
@@ -689,22 +490,13 @@ def render(base, user):
                                 "Dia da Semana": dia_escolhido, "Recorrente": True,
                                 "Data Inicio": str(data_inicio_rec),
                             }
-                            conflitos = _verificar_conflitos(
-                                df_aulas_todas, hora_norm_input, local_escolhido,
-                                dia_escolhido, None, True)
-                            if conflitos:
-                                st.session_state.update({'conflito_pendente': True,
-                                                         'aula_pendente': nova_aula,
-                                                         'conflitos_info': conflitos})
+                            try:
+                                base.append_row("Aulas", nova_aula)
+                                st.success(f"✅ **{aluno_escolhido}** adicionado às tuas aulas!")
+                                st.balloons()
                                 st.rerun()
-                            else:
-                                try:
-                                    base.append_row("Aulas", nova_aula)
-                                    st.success(f"✅ **{aluno_escolhido}** adicionado!")
-                                    st.balloons()
-                                    st.rerun()
-                                except Exception as e_add:
-                                    st.error(f"❌ Erro: {e_add}")
+                            except Exception as e_add:
+                                st.error(f"❌ Erro: {e_add}")
 
         if ja_atribuidos_lista:
             st.divider()
@@ -719,10 +511,8 @@ def render(base, user):
         st.subheader("📆 Marcar Aula Extra")
         st.caption("Marca uma aula pontual para um aluno que já está na tua lista.")
         if minhas_aulas.empty or 'Aluno' not in minhas_aulas.columns:
-            st.info("📭 Ainda não tens alunos.")
+            st.info("📭 Ainda não tens alunos. Adiciona primeiro na aba **➕ Adicionar Aluno**.")
         else:
-            if _render_bloco_conflito(base):
-                st.stop()
             alunos_meus = sorted(minhas_aulas['Aluno'].apply(_sv).dropna().unique().tolist())
             with st.form("form_aula_extra"):
                 aluno_extra = st.selectbox("Selecionar Aluno*", options=alunos_meus)
@@ -761,23 +551,14 @@ def render(base, user):
                             "Dia da Semana": "", "Recorrente": False,
                             "Data Aula": str(data_extra), "Data Inicio": str(data_extra),
                         }
-                        conflitos_e = _verificar_conflitos(
-                            df_aulas_todas, hora_norm_extra, local_extra,
-                            None, data_extra, False)
-                        if conflitos_e:
-                            st.session_state.update({'conflito_pendente': True,
-                                                     'aula_pendente': nova_aula_extra,
-                                                     'conflitos_info': conflitos_e})
+                        try:
+                            base.append_row("Aulas", nova_aula_extra)
+                            st.success(f"✅ Aula extra marcada para **{aluno_extra}** "
+                                       f"em {data_extra.strftime('%d/%m/%Y')} às {hora_norm_extra}!")
+                            st.balloons()
                             st.rerun()
-                        else:
-                            try:
-                                base.append_row("Aulas", nova_aula_extra)
-                                st.success(f"✅ Aula extra marcada para **{aluno_extra}** "
-                                           f"em {data_extra.strftime('%d/%m/%Y')} às {hora_norm_extra}!")
-                                st.balloons()
-                                st.rerun()
-                            except Exception as e_extra:
-                                st.error(f"❌ Erro: {e_extra}")
+                        except Exception as e_extra:
+                            st.error(f"❌ Erro: {e_extra}")
 
     # ========================================
     # TAB 4: CALENDÁRIO
