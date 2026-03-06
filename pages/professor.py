@@ -34,17 +34,28 @@ CORES_PROFESSORES = [
 # HELPERS
 # ============================================
 
+def _sv(val):
+    """
+    ✅ FIX PRINCIPAL: SeaTable single-select devolve listas ['Oeiras'].
+    Esta função normaliza para string em qualquer caso.
+    """
+    if val is None:
+        return ''
+    if isinstance(val, list):
+        return str(val[0]).strip() if val else ''
+    return str(val).strip()
+
+
 def _normalizar_recorrente(val):
     if isinstance(val, bool):
         return val
+    if isinstance(val, list):
+        val = val[0] if val else False
     return str(val).lower() in ['true', '1', 'yes', 'sim']
 
 
 def _get_aulas_do_mes(df_aulas, ano, mes):
-    """
-    Retorna dict {dia: [lista de aulas]} para o mês/ano dado.
-    Aulas recorrentes só aparecem a partir de Data Inicio (ou _ctime se não existir).
-    """
+    """Retorna dict {dia: [lista de aulas]} para o mês/ano dado."""
     aulas_por_dia = {}
     if df_aulas.empty:
         return aulas_por_dia
@@ -60,12 +71,12 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
             is_recorrente = _normalizar_recorrente(aula.get('Recorrente', False))
 
             if is_recorrente:
-                dia_semana = str(aula.get('Dia da Semana', '') or '').strip()
+                # ✅ _sv() para single-select
+                dia_semana = _sv(aula.get('Dia da Semana', ''))
                 if dia_semana not in DIAS_PT_MAP or DIAS_PT_MAP[dia_semana] != weekday:
                     continue
 
-                # ✅ CORREÇÃO: só mostrar a partir da Data Inicio
-                data_inicio_raw = str(aula.get('Data Inicio', '') or '').strip()
+                data_inicio_raw = _sv(aula.get('Data Inicio', ''))
                 if data_inicio_raw:
                     try:
                         data_inicio = datetime.strptime(data_inicio_raw[:10], '%Y-%m-%d').date()
@@ -74,8 +85,7 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
                     except Exception:
                         pass
                 else:
-                    # Fallback: usar _ctime (data de criação no SeaTable)
-                    ctime_raw = str(aula.get('_ctime', '') or '').strip()
+                    ctime_raw = _sv(aula.get('_ctime', ''))
                     if ctime_raw:
                         try:
                             data_criacao = datetime.strptime(ctime_raw[:10], '%Y-%m-%d').date()
@@ -87,7 +97,7 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
                 aulas_do_dia.append(aula)
 
             else:
-                data_raw = str(aula.get('Data Aula', '') or '').strip()
+                data_raw = _sv(aula.get('Data Aula', ''))
                 if data_raw:
                     try:
                         if datetime.strptime(data_raw[:10], '%Y-%m-%d').date() == data_dia:
@@ -102,77 +112,82 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
 
 
 def _verificar_conflitos(df_aulas, hora, local, dia_semana, data_especifica, recorrente):
-    """Verifica conflitos de horário. Retorna lista de conflitos."""
+    """
+    Verifica conflitos de horário e local.
+    ✅ Usa _sv() para normalizar campos single-select do SeaTable.
+    """
     conflitos = []
     if df_aulas.empty:
         return conflitos
 
+    hora = hora.strip()
+    local = local.strip()
+
     for _, aula in df_aulas.iterrows():
-        aula_hora = str(aula.get('Hora', '') or '').strip()
-        aula_local = str(aula.get('Local', '') or '').strip()
+        # ✅ _sv() aqui é o fix principal — sem isto 'Oeiras' != "['Oeiras']"
+        aula_hora = _sv(aula.get('Hora', ''))
+        aula_local = _sv(aula.get('Local', ''))
 
         if aula_hora != hora or aula_local != local:
             continue
 
         aula_recorrente = _normalizar_recorrente(aula.get('Recorrente', False))
+        # ✅ _sv() para Dia da Semana também
+        aula_dia = _sv(aula.get('Dia da Semana', ''))
 
         if recorrente and dia_semana:
             if aula_recorrente:
-                aula_dia = str(aula.get('Dia da Semana', '') or '').strip()
                 if aula_dia == dia_semana:
                     conflitos.append({
-                        'professor': aula.get('Professor', '---'),
-                        'aluno': aula.get('Aluno', '---'),
-                        'tipo': f"Recorrente ({aula_dia})",
-                        'hora': aula_hora,
-                        'local': aula_local
+                        'professor': _sv(aula.get('Professor', '---')) or '---',
+                        'aluno':     _sv(aula.get('Aluno', '---')) or '---',
+                        'tipo':      f"Recorrente ({aula_dia})",
+                        'hora':      aula_hora,
+                        'local':     aula_local,
                     })
             else:
-                data_raw = str(aula.get('Data Aula', '') or '').strip()
+                data_raw = _sv(aula.get('Data Aula', ''))
                 if data_raw and dia_semana in DIAS_PT_MAP:
                     try:
                         d = datetime.strptime(data_raw[:10], '%Y-%m-%d').date()
                         if d.weekday() == DIAS_PT_MAP[dia_semana]:
                             conflitos.append({
-                                'professor': aula.get('Professor', '---'),
-                                'aluno': aula.get('Aluno', '---'),
-                                'tipo': f"Data específica {data_raw[:10]}",
-                                'hora': aula_hora,
-                                'local': aula_local
+                                'professor': _sv(aula.get('Professor', '---')) or '---',
+                                'aluno':     _sv(aula.get('Aluno', '---')) or '---',
+                                'tipo':      f"Data específica {data_raw[:10]}",
+                                'hora':      aula_hora,
+                                'local':     aula_local,
                             })
                     except Exception:
                         pass
+
         elif not recorrente and data_especifica:
             weekday_nova = data_especifica.weekday()
             if aula_recorrente:
-                aula_dia = str(aula.get('Dia da Semana', '') or '').strip()
                 if aula_dia in DIAS_PT_MAP and DIAS_PT_MAP[aula_dia] == weekday_nova:
                     conflitos.append({
-                        'professor': aula.get('Professor', '---'),
-                        'aluno': aula.get('Aluno', '---'),
-                        'tipo': f"Recorrente ({aula_dia})",
-                        'hora': aula_hora,
-                        'local': aula_local
+                        'professor': _sv(aula.get('Professor', '---')) or '---',
+                        'aluno':     _sv(aula.get('Aluno', '---')) or '---',
+                        'tipo':      f"Recorrente ({aula_dia})",
+                        'hora':      aula_hora,
+                        'local':     aula_local,
                     })
             else:
-                data_raw = str(aula.get('Data Aula', '') or '').strip()
+                data_raw = _sv(aula.get('Data Aula', ''))
                 if data_raw[:10] == str(data_especifica)[:10]:
                     conflitos.append({
-                        'professor': aula.get('Professor', '---'),
-                        'aluno': aula.get('Aluno', '---'),
-                        'tipo': f"Data específica {data_raw[:10]}",
-                        'hora': aula_hora,
-                        'local': aula_local
+                        'professor': _sv(aula.get('Professor', '---')) or '---',
+                        'aluno':     _sv(aula.get('Aluno', '---')) or '---',
+                        'tipo':      f"Data específica {data_raw[:10]}",
+                        'hora':      aula_hora,
+                        'local':     aula_local,
                     })
 
     return conflitos
 
 
 def _render_bloco_conflito(base):
-    """
-    Mostra bloco de confirmação de conflito se houver um pendente.
-    Retorna True se existe conflito pendente (para fazer st.stop() depois).
-    """
+    """Mostra bloco de confirmação de conflito pendente. Retorna True se existe."""
     if not st.session_state.get('conflito_pendente', False):
         return False
 
@@ -197,8 +212,6 @@ def _render_bloco_conflito(base):
                 st.session_state['conflito_pendente'] = False
                 st.session_state.pop('aula_pendente', None)
                 st.session_state.pop('conflitos_info', None)
-                # ✅ Forçar reload de dados no próximo render
-                st.session_state['cal_force_refresh'] = True
                 st.success(f"✅ **{nova_aula.get('Aluno')}** adicionado com sucesso!")
                 st.balloons()
                 st.rerun()
@@ -227,7 +240,6 @@ def _render_calendario(df_aulas):
     ano = st.session_state['cal_ano']
     mes = st.session_state['cal_mes']
 
-    # ---- Navegação ----
     col_prev, col_titulo, col_hoje_btn, col_ref, col_next = st.columns([1, 3, 1, 1, 1])
     with col_prev:
         if st.button("◀ Anterior", use_container_width=True, key="cal_prev"):
@@ -249,7 +261,6 @@ def _render_calendario(df_aulas):
             st.session_state['cal_mes'] = hoje.month
             st.rerun()
     with col_ref:
-        # ✅ CORREÇÃO: botão de refresh explícito
         if st.button("🔄", use_container_width=True, key="cal_refresh", help="Atualizar calendário"):
             st.rerun()
     with col_next:
@@ -261,34 +272,37 @@ def _render_calendario(df_aulas):
                 st.session_state['cal_mes'] = mes + 1
             st.rerun()
 
-    # ---- Filtros ----
     col_f1, col_f2 = st.columns(2)
     with col_f1:
         locais_disp = ["Todos"]
         if not df_aulas.empty and 'Local' in df_aulas.columns:
-            locais_disp += sorted(df_aulas['Local'].dropna().unique().tolist())
+            # ✅ _sv() para não aparecer "['Oeiras']" no filtro
+            locais_disp += sorted(set(
+                _sv(v) for v in df_aulas['Local'].dropna() if _sv(v)
+            ))
         filtro_local = st.selectbox("📍 Filtrar por Local", locais_disp, key="cal_loc")
     with col_f2:
         profs_disp = ["Todos"]
         if not df_aulas.empty and 'Professor' in df_aulas.columns:
-            profs_disp += sorted(df_aulas['Professor'].dropna().unique().tolist())
+            profs_disp += sorted(set(
+                _sv(v) for v in df_aulas['Professor'].dropna() if _sv(v)
+            ))
         filtro_prof = st.selectbox("👨‍🏫 Filtrar por Professor", profs_disp, key="cal_prof")
 
     df_fil = df_aulas.copy() if not df_aulas.empty else pd.DataFrame()
     if not df_fil.empty:
         if filtro_local != "Todos" and 'Local' in df_fil.columns:
-            df_fil = df_fil[df_fil['Local'] == filtro_local]
+            df_fil = df_fil[df_fil['Local'].apply(_sv) == filtro_local]
         if filtro_prof != "Todos" and 'Professor' in df_fil.columns:
-            df_fil = df_fil[df_fil['Professor'] == filtro_prof]
+            df_fil = df_fil[df_fil['Professor'].apply(_sv) == filtro_prof]
 
     profs_todos = []
     if not df_aulas.empty and 'Professor' in df_aulas.columns:
-        profs_todos = sorted(df_aulas['Professor'].dropna().unique().tolist())
+        profs_todos = sorted(set(_sv(v) for v in df_aulas['Professor'].dropna() if _sv(v)))
     cores_prof = {p: CORES_PROFESSORES[i % len(CORES_PROFESSORES)] for i, p in enumerate(profs_todos)}
 
     aulas_por_dia = _get_aulas_do_mes(df_fil, ano, mes)
 
-    # ---- CSS ----
     css = """
     <style>
     .bmo-cal { width:100%; border-collapse:collapse; table-layout:fixed; margin-top:8px; }
@@ -346,12 +360,12 @@ def _render_calendario(df_aulas):
                 html += f'<div class="{num_class}">{dia}</div>'
 
                 if dia in aulas_por_dia:
-                    for aula in sorted(aulas_por_dia[dia], key=lambda a: str(a.get('Hora', ''))):
-                        prof = str(aula.get('Professor', '') or '')
-                        aluno = str(aula.get('Aluno', '') or '')
-                        hora = str(aula.get('Hora', '') or '')
-                        local = str(aula.get('Local', '') or '')
-                        cor = cores_prof.get(prof, '#888888')
+                    for aula in sorted(aulas_por_dia[dia], key=lambda a: _sv(a.get('Hora', ''))):
+                        prof  = _sv(aula.get('Professor', ''))
+                        aluno = _sv(aula.get('Aluno', ''))
+                        hora  = _sv(aula.get('Hora', ''))
+                        local = _sv(aula.get('Local', ''))
+                        cor   = cores_prof.get(prof, '#888888')
                         tooltip = f"{hora} | {aluno} | {prof} | {local}"
                         html += (f'<span class="aula-pill" style="background:{cor}" title="{tooltip}">'
                                  f'{hora} {aluno[:12]}</span>')
@@ -362,7 +376,6 @@ def _render_calendario(df_aulas):
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # ---- Métricas ----
     st.divider()
     total_ocorrencias = sum(len(v) for v in aulas_por_dia.values())
     dias_com_aulas = len(aulas_por_dia)
@@ -373,7 +386,6 @@ def _render_calendario(df_aulas):
         dia_cheio = max(aulas_por_dia, key=lambda d: len(aulas_por_dia[d]))
         col3.metric("🔥 Dia mais ocupado", f"{dia_cheio} {MESES_PT[mes][:3]}")
 
-    # ---- Detalhe por dia ----
     st.divider()
     st.markdown("#### 🔍 Detalhe de um Dia")
     dias_lista = sorted(aulas_por_dia.keys())
@@ -387,19 +399,19 @@ def _render_calendario(df_aulas):
             key="cal_dia_detalhe"
         )
         if dia_sel:
-            aulas_sel = sorted(aulas_por_dia[dia_sel], key=lambda a: str(a.get('Hora', '')))
+            aulas_sel = sorted(aulas_por_dia[dia_sel], key=lambda a: _sv(a.get('Hora', '')))
             for aula in aulas_sel:
-                prof = aula.get('Professor', '---')
-                cor = cores_prof.get(prof, '#888')
+                prof = _sv(aula.get('Professor', '---')) or '---'
+                cor  = cores_prof.get(prof, '#888')
                 rec_str = "🔁" if _normalizar_recorrente(aula.get('Recorrente', False)) else "📌"
                 st.markdown(
                     f"<div style='border-left:4px solid {cor}; padding:6px 10px; margin:4px 0;"
                     f"background:#fafafa; border-radius:0 6px 6px 0'>"
-                    f"{rec_str} 🕐 <b>{aula.get('Hora','---')}</b> &nbsp;|&nbsp; "
-                    f"👤 {aula.get('Aluno','---')} &nbsp;|&nbsp; "
+                    f"{rec_str} 🕐 <b>{_sv(aula.get('Hora','---')) or '---'}</b> &nbsp;|&nbsp; "
+                    f"👤 {_sv(aula.get('Aluno','---')) or '---'} &nbsp;|&nbsp; "
                     f"👨‍🏫 {prof} &nbsp;|&nbsp; "
-                    f"📍 {aula.get('Local','---')} &nbsp;|&nbsp; "
-                    f"🏫 {aula.get('Sala','---')}"
+                    f"📍 {_sv(aula.get('Local','---')) or '---'} &nbsp;|&nbsp; "
+                    f"🏫 {_sv(aula.get('Sala','---')) or '---'}"
                     f"</div>",
                     unsafe_allow_html=True
                 )
@@ -421,21 +433,20 @@ def render(base, user):
         "📅 Calendário"
     ])
 
-    # ========================================
-    # CARREGAR DADOS (sempre frescos após rerun)
-    # ========================================
     try:
-        aulas_raw = base.list_rows("Aulas")
+        aulas_raw  = base.list_rows("Aulas")
         alunos_raw = base.list_rows("Alunos")
     except Exception as e:
         st.error(f"❌ Erro ao carregar dados: {e}")
         return
 
-    df_alunos = pd.DataFrame(alunos_raw) if alunos_raw else pd.DataFrame()
-    df_aulas_todas = pd.DataFrame(aulas_raw) if aulas_raw else pd.DataFrame()
+    df_alunos     = pd.DataFrame(alunos_raw)  if alunos_raw  else pd.DataFrame()
+    df_aulas_todas = pd.DataFrame(aulas_raw)  if aulas_raw   else pd.DataFrame()
 
     if not df_aulas_todas.empty and 'Professor' in df_aulas_todas.columns:
-        minhas_aulas = df_aulas_todas[df_aulas_todas['Professor'] == user['display_name']].copy()
+        minhas_aulas = df_aulas_todas[
+            df_aulas_todas['Professor'].apply(_sv) == user['display_name']
+        ].copy()
     else:
         minhas_aulas = pd.DataFrame()
 
@@ -452,7 +463,7 @@ def render(base, user):
             col1.metric("👥 Total de Registos", len(minhas_aulas))
 
             if 'Local' in minhas_aulas.columns:
-                locais = minhas_aulas['Local'].value_counts()
+                locais = minhas_aulas['Local'].apply(_sv).value_counts()
                 col2.metric("📍 Local mais frequente", locais.index[0] if not locais.empty else "---")
 
             recorrentes = 0
@@ -463,67 +474,63 @@ def render(base, user):
             st.divider()
 
             for _, aula in minhas_aulas.iterrows():
-                nome_aluno = aula.get('Aluno', 'Sem nome')
-                hora = aula.get('Hora', '---')
-                sala = str(aula.get('Sala', '') or '---')
-                local = aula.get('Local', '---')
-                dia = str(aula.get('Dia da Semana', '') or '')
-                recorrente = _normalizar_recorrente(aula.get('Recorrente', False))
-                data_aula = str(aula.get('Data Aula', '') or '')
-                data_inicio = str(aula.get('Data Inicio', '') or '')
-                row_id = aula.get('_id')
+                nome_aluno  = _sv(aula.get('Aluno', 'Sem nome')) or 'Sem nome'
+                hora        = _sv(aula.get('Hora', '---')) or '---'
+                sala        = _sv(aula.get('Sala', '---')) or '---'
+                local       = _sv(aula.get('Local', '---')) or '---'
+                dia         = _sv(aula.get('Dia da Semana', ''))
+                recorrente  = _normalizar_recorrente(aula.get('Recorrente', False))
+                data_aula   = _sv(aula.get('Data Aula', ''))
+                data_inicio = _sv(aula.get('Data Inicio', ''))
+                row_id      = aula.get('_id')
 
-                if dia and dia.strip():
+                if dia:
                     horario_str = f"{dia} {hora}"
-                elif data_aula and data_aula.strip():
+                elif data_aula:
                     horario_str = f"{data_aula[:10]} {hora}"
                 else:
                     horario_str = hora
 
                 telefone, email = "---", "---"
                 if not df_alunos.empty and 'Nome' in df_alunos.columns:
-                    match = df_alunos[df_alunos['Nome'] == nome_aluno]
+                    match = df_alunos[df_alunos['Nome'].apply(_sv) == nome_aluno]
                     if not match.empty:
                         a = match.iloc[0]
-                        telefone = str(a.get('Telefone', '') or '---').strip() or '---'
-                        email = str(a.get('Email', '') or '---').strip() or '---'
+                        telefone = _sv(a.get('Telefone', '')) or '---'
+                        email    = _sv(a.get('Email', ''))    or '---'
 
                 tipo_badge = "🔁 Recorrente" if recorrente else "📌 Pontual"
-                edit_key = f"edit_aula_{row_id}"
+                edit_key   = f"edit_aula_{row_id}"
                 if edit_key not in st.session_state:
                     st.session_state[edit_key] = False
 
                 with st.expander(f"🎵 {nome_aluno} — {horario_str} | {local} | {tipo_badge}"):
 
-                    # ---- MODO EDIÇÃO (só para recorrentes) ----
                     if st.session_state[edit_key] and recorrente:
                         st.markdown("#### ✏️ Editar Aula Recorrente")
                         with st.form(f"form_edit_aula_{row_id}"):
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                dias_semana_opts = ["", "Segunda-Feira", "Terça-Feira", "Quarta-Feira",
-                                                    "Quinta-Feira", "Sexta-Feira", "Sábado", "Domingo"]
-                                dia_idx = dias_semana_opts.index(dia) if dia in dias_semana_opts else 0
-                                novo_dia = st.selectbox("Dia da Semana*", options=dias_semana_opts, index=dia_idx)
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                dias_opts = ["", "Segunda-Feira", "Terça-Feira", "Quarta-Feira",
+                                             "Quinta-Feira", "Sexta-Feira", "Sábado", "Domingo"]
+                                dia_idx  = dias_opts.index(dia) if dia in dias_opts else 0
+                                novo_dia = st.selectbox("Dia da Semana*", options=dias_opts, index=dia_idx)
                                 nova_hora = st.text_input("Hora*", value=hora)
-
-                                # Data de início editável
                                 try:
                                     di_val = datetime.strptime(data_inicio[:10], '%Y-%m-%d').date() if data_inicio else date.today()
                                 except Exception:
                                     di_val = date.today()
-                                nova_data_inicio = st.date_input("Data de Início", value=di_val)
-
-                            with col2:
+                                nova_di = st.date_input("Data de Início", value=di_val)
+                            with c2:
                                 local_opts = ["Oeiras", "Algés", "Outro"]
-                                local_idx = local_opts.index(local) if local in local_opts else 0
+                                local_idx  = local_opts.index(local) if local in local_opts else 0
                                 novo_local = st.selectbox("Local", options=local_opts, index=local_idx)
-                                nova_sala = st.text_input("Sala", value=sala if sala != '---' else '')
+                                nova_sala  = st.text_input("Sala", value=sala if sala != '---' else '')
 
-                            col_s, col_c = st.columns(2)
-                            with col_s:
-                                guardar = st.form_submit_button("💾 Guardar", use_container_width=True, type="primary")
-                            with col_c:
+                            cs, cc = st.columns(2)
+                            with cs:
+                                guardar  = st.form_submit_button("💾 Guardar", use_container_width=True, type="primary")
+                            with cc:
                                 cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
 
                             if guardar:
@@ -533,10 +540,10 @@ def render(base, user):
                                     try:
                                         base.update_row("Aulas", row_id, {
                                             "Dia da Semana": novo_dia,
-                                            "Hora": nova_hora.strip(),
-                                            "Local": novo_local,
-                                            "Sala": nova_sala.strip(),
-                                            "Data Inicio": str(nova_data_inicio),
+                                            "Hora":          nova_hora.strip(),
+                                            "Local":         novo_local,
+                                            "Sala":          nova_sala.strip(),
+                                            "Data Inicio":   str(nova_di),
                                         })
                                         st.session_state[edit_key] = False
                                         st.success("✅ Aula atualizada!")
@@ -547,41 +554,31 @@ def render(base, user):
                                 st.session_state[edit_key] = False
                                 st.rerun()
 
-                    # ---- MODO VISUALIZAÇÃO ----
                     else:
                         col_info, col_contacto, col_acao = st.columns([3, 3, 1])
-
                         with col_info:
                             st.markdown("**📅 Horário**")
                             st.write(f"🕐 **Hora:** {hora}")
-                            if dia and dia.strip():
-                                st.write(f"📆 **Dia:** {dia}")
-                            if data_aula and data_aula.strip():
-                                st.write(f"📅 **Data:** {data_aula[:10]}")
-                            if data_inicio and data_inicio.strip():
-                                st.write(f"▶️ **Início:** {data_inicio[:10]}")
+                            if dia: st.write(f"📆 **Dia:** {dia}")
+                            if data_aula: st.write(f"📅 **Data:** {data_aula[:10]}")
+                            if data_inicio: st.write(f"▶️ **Início:** {data_inicio[:10]}")
                             st.write(f"🏫 **Sala:** {sala}")
                             st.write(f"📍 **Local:** {local}")
                             st.write(f"🔁 **Recorrente:** {'Sim' if recorrente else 'Não'}")
-
                         with col_contacto:
                             st.markdown("**📞 Contacto do Aluno**")
                             st.write(f"📞 **Telefone:** {telefone}")
                             st.write(f"📧 **Email:** {email}")
-                            contacto_aula = str(aula.get('Contacto', '') or '').strip()
+                            contacto_aula = _sv(aula.get('Contacto', ''))
                             if contacto_aula and contacto_aula != '---':
                                 st.write(f"📱 **Contacto (aula):** {contacto_aula}")
-
                         with col_acao:
                             st.markdown("**⚙️ Ações**")
                             confirm_key = f"confirm_remove_{row_id}"
-
-                            # Editar só para recorrentes
                             if recorrente:
                                 if st.button("✏️ Editar", key=f"edit_btn_{row_id}", use_container_width=True):
                                     st.session_state[edit_key] = True
                                     st.rerun()
-
                             if st.session_state.get(confirm_key, False):
                                 st.warning("Tens a certeza?")
                                 if st.button("✅ Sim", key=f"yes_{row_id}", use_container_width=True, type="primary"):
@@ -601,7 +598,7 @@ def render(base, user):
                                     st.rerun()
 
     # ========================================
-    # TAB 2: ADICIONAR ALUNO (recorrente, novo)
+    # TAB 2: ADICIONAR ALUNO
     # ========================================
     with t2:
         st.subheader("➕ Adicionar Aluno à Minha Lista")
@@ -613,12 +610,11 @@ def render(base, user):
 
         nomes_ja_atribuidos = set()
         if not minhas_aulas.empty and 'Aluno' in minhas_aulas.columns:
-            # Só conta como "já atribuído" se tiver aula recorrente
             rec_mask = minhas_aulas['Recorrente'].apply(_normalizar_recorrente)
-            nomes_ja_atribuidos = set(minhas_aulas[rec_mask]['Aluno'].dropna().tolist())
+            nomes_ja_atribuidos = set(minhas_aulas[rec_mask]['Aluno'].apply(_sv).dropna().tolist())
 
-        todos_alunos = df_alunos['Nome'].dropna().sort_values().tolist()
-        disponiveis = [n for n in todos_alunos if n not in nomes_ja_atribuidos]
+        todos_alunos      = df_alunos['Nome'].apply(_sv).dropna().sort_values().tolist()
+        disponiveis       = [n for n in todos_alunos if n not in nomes_ja_atribuidos]
         ja_atribuidos_lista = [n for n in todos_alunos if n in nomes_ja_atribuidos]
 
         st.info(
@@ -633,47 +629,41 @@ def render(base, user):
         if not disponiveis:
             st.success("✅ Todos os alunos da escola já têm aula recorrente contigo!")
         else:
-            pesquisa_aluno = st.text_input("🔍 Pesquisar aluno", placeholder="Escreve parte do nome...", key="pesq_novo")
-            disponiveis_filtrados = (
-                [n for n in disponiveis if pesquisa_aluno.strip().lower() in n.lower()]
-                if pesquisa_aluno.strip() else disponiveis
-            )
+            pesquisa = st.text_input("🔍 Pesquisar aluno", placeholder="Escreve parte do nome...", key="pesq_novo")
+            disp_fil = [n for n in disponiveis if pesquisa.strip().lower() in n.lower()] if pesquisa.strip() else disponiveis
 
-            if not disponiveis_filtrados:
-                st.warning(f"Nenhum aluno encontrado com '{pesquisa_aluno}'")
+            if not disp_fil:
+                st.warning(f"Nenhum aluno encontrado com '{pesquisa}'")
             else:
                 with st.form("form_add_aluno"):
                     st.markdown("#### 👤 Selecionar Aluno")
-                    aluno_escolhido = st.selectbox("Aluno*", options=disponiveis_filtrados)
+                    aluno_escolhido = st.selectbox("Aluno*", options=disp_fil)
 
                     if aluno_escolhido:
-                        match = df_alunos[df_alunos['Nome'] == aluno_escolhido]
+                        match = df_alunos[df_alunos['Nome'].apply(_sv) == aluno_escolhido]
                         if not match.empty:
                             a = match.iloc[0]
                             parts = []
-                            for campo, icone in [('Telefone', '📞'), ('Email', '📧'), ('Pólo da escola', '📍')]:
-                                v = str(a.get(campo, '') or '').strip()
+                            for campo, icone in [('Telefone','📞'),('Email','📧'),('Pólo da escola','📍')]:
+                                v = _sv(a.get(campo, ''))
                                 if v: parts.append(f"{icone} {v}")
-                            instr = str(a.get('Instrumento Pretendido', '') or str(a.get('Instrumentos', '') or '')).strip()
+                            instr = _sv(a.get('Instrumento Pretendido','')) or _sv(a.get('Instrumentos',''))
                             if instr: parts.append(f"🎷 {instr}")
                             if parts: st.success("  |  ".join(parts))
 
                     st.markdown("#### 📅 Dados da Aula Recorrente")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        dias_semana = ["", "Segunda-Feira", "Terça-Feira", "Quarta-Feira",
-                                       "Quinta-Feira", "Sexta-Feira", "Sábado", "Domingo"]
-                        dia_escolhido = st.selectbox("Dia da Semana*", options=dias_semana)
-                        hora_aula = st.text_input("Hora*", placeholder="Ex: 16:00")
-                        data_inicio_rec = st.date_input(
-                            "Data de Início*",
-                            value=date.today(),
-                            help="A partir de que data começa esta aula recorrente"
-                        )
-                    with col2:
-                        local_opcoes = ["Oeiras", "Algés", "Outro"]
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        dias_semana = ["","Segunda-Feira","Terça-Feira","Quarta-Feira",
+                                       "Quinta-Feira","Sexta-Feira","Sábado","Domingo"]
+                        dia_escolhido   = st.selectbox("Dia da Semana*", options=dias_semana)
+                        hora_aula       = st.text_input("Hora*", placeholder="Ex: 16:00")
+                        data_inicio_rec = st.date_input("Data de Início*", value=date.today(),
+                                                        help="A partir de que data começa esta aula recorrente")
+                    with c2:
+                        local_opcoes   = ["Oeiras", "Algés", "Outro"]
                         local_escolhido = st.selectbox("Local", options=local_opcoes)
-                        sala_aula = st.text_input("Sala", placeholder="Ex: Sala 3")
+                        sala_aula       = st.text_input("Sala", placeholder="Ex: Sala 3")
 
                     st.caption("* Campos obrigatórios")
 
@@ -684,20 +674,20 @@ def render(base, user):
                             st.error("⚠️ O dia da semana é obrigatório")
                         else:
                             contacto_aluno = ""
-                            match_c = df_alunos[df_alunos['Nome'] == aluno_escolhido]
-                            if not match_c.empty:
-                                contacto_aluno = str(match_c.iloc[0].get('Telefone', '') or '').strip()
+                            mc = df_alunos[df_alunos['Nome'].apply(_sv) == aluno_escolhido]
+                            if not mc.empty:
+                                contacto_aluno = _sv(mc.iloc[0].get('Telefone', ''))
 
                             nova_aula = {
-                                "Professor": user['display_name'],
-                                "Aluno": aluno_escolhido,
-                                "Hora": hora_aula.strip(),
-                                "Sala": sala_aula.strip(),
-                                "Contacto": contacto_aluno,
-                                "Local": local_escolhido,
+                                "Professor":    user['display_name'],
+                                "Aluno":        aluno_escolhido,
+                                "Hora":         hora_aula.strip(),
+                                "Sala":         sala_aula.strip(),
+                                "Contacto":     contacto_aluno,
+                                "Local":        local_escolhido,
                                 "Dia da Semana": dia_escolhido,
-                                "Recorrente": True,
-                                "Data Inicio": str(data_inicio_rec),
+                                "Recorrente":   True,
+                                "Data Inicio":  str(data_inicio_rec),
                             }
 
                             conflitos = _verificar_conflitos(
@@ -706,8 +696,8 @@ def render(base, user):
                             )
                             if conflitos:
                                 st.session_state['conflito_pendente'] = True
-                                st.session_state['aula_pendente'] = nova_aula
-                                st.session_state['conflitos_info'] = conflitos
+                                st.session_state['aula_pendente']     = nova_aula
+                                st.session_state['conflitos_info']    = conflitos
                                 st.rerun()
                             else:
                                 try:
@@ -725,11 +715,11 @@ def render(base, user):
                     st.write(f"✅ {n}")
 
     # ========================================
-    # TAB 3: AULA EXTRA (aluno já na lista, pontual)
+    # TAB 3: AULA EXTRA
     # ========================================
     with t3:
         st.subheader("📆 Marcar Aula Extra")
-        st.caption("Marca uma aula pontual para um aluno que já está na tua lista (pode já ter aula recorrente).")
+        st.caption("Marca uma aula pontual para um aluno que já está na tua lista.")
 
         if minhas_aulas.empty or 'Aluno' not in minhas_aulas.columns:
             st.info("📭 Ainda não tens alunos. Adiciona primeiro na aba **➕ Adicionar Aluno**.")
@@ -737,33 +727,30 @@ def render(base, user):
             if _render_bloco_conflito(base):
                 st.stop()
 
-            alunos_meus = sorted(minhas_aulas['Aluno'].dropna().unique().tolist())
+            alunos_meus = sorted(minhas_aulas['Aluno'].apply(_sv).dropna().unique().tolist())
 
             with st.form("form_aula_extra"):
                 st.markdown("#### 👤 Aluno")
                 aluno_extra = st.selectbox("Selecionar Aluno*", options=alunos_meus)
 
-                # Preview contacto
                 if aluno_extra and not df_alunos.empty and 'Nome' in df_alunos.columns:
-                    match_e = df_alunos[df_alunos['Nome'] == aluno_extra]
-                    if not match_e.empty:
-                        a_e = match_e.iloc[0]
+                    me = df_alunos[df_alunos['Nome'].apply(_sv) == aluno_extra]
+                    if not me.empty:
                         parts_e = []
-                        tel_e = str(a_e.get('Telefone', '') or '').strip()
-                        eml_e = str(a_e.get('Email', '') or '').strip()
+                        tel_e = _sv(me.iloc[0].get('Telefone', ''))
+                        eml_e = _sv(me.iloc[0].get('Email', ''))
                         if tel_e: parts_e.append(f"📞 {tel_e}")
                         if eml_e: parts_e.append(f"📧 {eml_e}")
                         if parts_e: st.info("  |  ".join(parts_e))
 
                 st.markdown("#### 📅 Dados da Aula Extra")
-                col1, col2 = st.columns(2)
-                with col1:
+                c1, c2 = st.columns(2)
+                with c1:
                     data_extra = st.date_input("Data da Aula*", value=date.today())
                     hora_extra = st.text_input("Hora*", placeholder="Ex: 17:00")
-                with col2:
-                    local_opcoes_e = ["Oeiras", "Algés", "Outro"]
-                    local_extra = st.selectbox("Local", options=local_opcoes_e, key="local_extra")
-                    sala_extra = st.text_input("Sala", placeholder="Ex: Sala 1", key="sala_extra")
+                with c2:
+                    local_extra = st.selectbox("Local", options=["Oeiras","Algés","Outro"], key="local_extra")
+                    sala_extra  = st.text_input("Sala", placeholder="Ex: Sala 1", key="sala_extra")
 
                 st.caption("* Campos obrigatórios")
 
@@ -772,22 +759,21 @@ def render(base, user):
                         st.error("⚠️ A hora é obrigatória")
                     else:
                         contacto_extra = ""
-                        if not df_alunos.empty and 'Nome' in df_alunos.columns:
-                            m = df_alunos[df_alunos['Nome'] == aluno_extra]
-                            if not m.empty:
-                                contacto_extra = str(m.iloc[0].get('Telefone', '') or '').strip()
+                        mx = df_alunos[df_alunos['Nome'].apply(_sv) == aluno_extra] if not df_alunos.empty else pd.DataFrame()
+                        if not mx.empty:
+                            contacto_extra = _sv(mx.iloc[0].get('Telefone', ''))
 
                         nova_aula_extra = {
-                            "Professor": user['display_name'],
-                            "Aluno": aluno_extra,
-                            "Hora": hora_extra.strip(),
-                            "Sala": sala_extra.strip(),
-                            "Contacto": contacto_extra,
-                            "Local": local_extra,
+                            "Professor":    user['display_name'],
+                            "Aluno":        aluno_extra,
+                            "Hora":         hora_extra.strip(),
+                            "Sala":         sala_extra.strip(),
+                            "Contacto":     contacto_extra,
+                            "Local":        local_extra,
                             "Dia da Semana": "",
-                            "Recorrente": False,
-                            "Data Aula": str(data_extra),
-                            "Data Inicio": str(data_extra),
+                            "Recorrente":   False,
+                            "Data Aula":    str(data_extra),
+                            "Data Inicio":  str(data_extra),
                         }
 
                         conflitos_e = _verificar_conflitos(
@@ -796,8 +782,8 @@ def render(base, user):
                         )
                         if conflitos_e:
                             st.session_state['conflito_pendente'] = True
-                            st.session_state['aula_pendente'] = nova_aula_extra
-                            st.session_state['conflitos_info'] = conflitos_e
+                            st.session_state['aula_pendente']     = nova_aula_extra
+                            st.session_state['conflitos_info']    = conflitos_e
                             st.rerun()
                         else:
                             try:
