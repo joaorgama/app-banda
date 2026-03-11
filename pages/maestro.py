@@ -316,7 +316,7 @@ def render(base, user):
     # TAB 5: ANIVERSÁRIOS
     # ========================================
     with t5:
-        st.subheader("🎂 Aniversários Próximos")
+        st.subheader("🎂 Aniversários")
 
         try:
             musicos = base.list_rows("Musicos")
