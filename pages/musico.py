@@ -280,6 +280,27 @@ def render(base, user):
     with t5:
         st.subheader("🖼️ Galeria de Eventos")
 
+        def _normalizar_url_imagem(url):
+            """Converte links do Google Drive para URL de imagem direta"""
+            if not url:
+                return url
+            url = str(url).strip()
+            # Google Drive: /file/d/FILE_ID/view → uc?export=view&id=FILE_ID
+            if "drive.google.com/file/d/" in url:
+                try:
+                    file_id = url.split("/file/d/")[1].split("/")[0]
+                    return f"https://drive.google.com/uc?export=view&id={file_id}"
+                except Exception:
+                    return url
+            # Google Drive: open?id=FILE_ID
+            if "drive.google.com/open?id=" in url:
+                try:
+                    file_id = url.split("open?id=")[1].split("&")[0]
+                    return f"https://drive.google.com/uc?export=view&id={file_id}"
+                except Exception:
+                    return url
+            return url
+
         try:
             eventos_gal        = base.list_rows("Eventos")
             eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
@@ -290,15 +311,21 @@ def render(base, user):
                 cols = st.columns(3)
                 for i, ev in enumerate(eventos_com_cartaz):
                     with cols[i % 3]:
-                        st.image(
-                            ev['Cartaz'],
-                            caption=ev.get('Nome do Evento', 'Evento'),
-                            use_column_width=True
-                        )
+                        url_cartaz = _normalizar_url_imagem(ev['Cartaz'])
+                        try:
+                            st.image(
+                                url_cartaz,
+                                caption=ev.get('Nome do Evento', 'Evento'),
+                                use_column_width=True
+                            )
+                        except Exception:
+                            st.warning(f"⚠️ Não foi possível carregar o cartaz")
+                            st.link_button("🔗 Ver Cartaz", ev['Cartaz'], use_container_width=True)
                         st.caption(formatar_data_pt(ev.get('Data')))
 
         except Exception as e:
             st.error(f"Erro ao carregar galeria: {e}")
+
 
     # ========================================
     # TAB 6: MENSAGENS
