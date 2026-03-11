@@ -8,7 +8,7 @@ from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta, date
 
 # ============================================
-# HELPERS ENSAIOS (partilhados com direcao.py)
+# HELPERS ENSAIOS
 # ============================================
 _DIAS_PT_MAP = {
     "Segunda-Feira": 0, "Terça-Feira": 1, "Quarta-Feira": 2,
@@ -73,7 +73,8 @@ def _get_ensaios_do_mes(ensaios, ano, mes):
                             lista.append(e)
                     except Exception:
                         pass
-            elif tipo in ('Semanal', 'Período'):
+            else:
+                # Semanal, Período ou qualquer outro valor recorrente
                 dia_sem = _sv(e.get('Dia da Semana', ''))
                 if dia_sem not in _DIAS_PT_MAP or _DIAS_PT_MAP[dia_sem] != weekday:
                     continue
@@ -84,14 +85,14 @@ def _get_ensaios_do_mes(ensaios, ano, mes):
                             continue
                     except Exception:
                         pass
-                if tipo == 'Período':
-                    raw_fim = _sv(e.get('Data Fim', ''))
-                    if raw_fim:
-                        try:
-                            if data_dia > datetime.strptime(raw_fim[:10], '%Y-%m-%d').date():
-                                continue
-                        except Exception:
-                            pass
+                # Data Fim verificada SEMPRE que existir, independentemente do tipo
+                raw_fim = _sv(e.get('Data Fim', ''))
+                if raw_fim:
+                    try:
+                        if data_dia > datetime.strptime(raw_fim[:10], '%Y-%m-%d').date():
+                            continue
+                    except Exception:
+                        pass
                 lista.append(e)
         if lista:
             ensaios_por_dia[dia] = lista
@@ -234,7 +235,6 @@ def _render_calendario_maestro(base, ensaios, faltas, musicos):
                 unsafe_allow_html=True
             )
 
-            # Lista de faltas registadas
             faltas_dia = [
                 f for f in faltas
                 if _sv(f.get('EnsaioID', '')) == eid
@@ -262,7 +262,6 @@ def _render_calendario_maestro(base, ensaios, faltas, musicos):
             else:
                 st.success("✅ Sem faltas registadas para este ensaio")
 
-            # Cancelar só este dia (ensaios recorrentes)
             if tipo in ('Semanal', 'Período'):
                 if st.button(
                     f"🚫 Cancelar ensaio de {dia_sel} {_MESES_PT[mes]}",
@@ -299,7 +298,6 @@ def _render_calendario_maestro(base, ensaios, faltas, musicos):
 
 
 def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
-    dark = st.session_state.get('dark_mode', True)
 
     with st.expander("➕ Criar Novo Ensaio", expanded=False):
         with st.form("form_mae_novo_ensaio"):
@@ -353,16 +351,16 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
     tipos_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}
 
     for e in ensaios:
-        eid   = _sv(e.get('_id', ''))
-        nome  = _sv(e.get('Nome', 'Ensaio'))
-        tipo  = _sv(e.get('Tipo', 'Pontual'))
-        hora  = _hora_norm(e.get('Hora', ''))
-        local = _sv(e.get('Local', ''))
-        dia   = _sv(e.get('Dia da Semana', ''))
-        data  = _sv(e.get('Data', ''))[:10]
-        dfim  = _sv(e.get('Data Fim', ''))[:10]
+        eid        = _sv(e.get('_id', ''))
+        nome       = _sv(e.get('Nome', 'Ensaio'))
+        tipo       = _sv(e.get('Tipo', 'Pontual'))
+        hora       = _hora_norm(e.get('Hora', ''))
+        local      = _sv(e.get('Local', ''))
+        dia        = _sv(e.get('Dia da Semana', ''))
+        data       = _sv(e.get('Data', ''))[:10]
+        dfim       = _sv(e.get('Data Fim', ''))[:10]
         datas_canc = _datas_canceladas(e)
-        icon  = tipos_icon.get(tipo, '🥁')
+        icon       = tipos_icon.get(tipo, '🥁')
 
         subtitulo = f"{dia} a partir de {data}" if tipo == 'Semanal' else \
                     f"{dia} de {data} a {dfim}"  if tipo == 'Período'  else data
@@ -480,7 +478,6 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
                             st.session_state[confirm_del_key] = True
                             st.rerun()
 
-                # Repor datas canceladas individualmente
                 if st.session_state.get(f"mae_show_canc_{eid}", False) and datas_canc:
                     st.markdown("**🚫 Datas Canceladas (clica para repor):**")
                     for dc in sorted(datas_canc):
@@ -674,9 +671,9 @@ def render(base, user):
                         presencas_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
 
                         if presencas_evento:
-                            vao      = len([p for p in presencas_evento if p.get('Resposta') == 'Vou'])
-                            nao_vao  = len([p for p in presencas_evento if p.get('Resposta') == 'Não Vou'])
-                            talvez   = len([p for p in presencas_evento if p.get('Resposta') == 'Talvez'])
+                            vao       = len([p for p in presencas_evento if p.get('Resposta') == 'Vou'])
+                            nao_vao   = len([p for p in presencas_evento if p.get('Resposta') == 'Não Vou'])
+                            talvez    = len([p for p in presencas_evento if p.get('Resposta') == 'Talvez'])
                             pendentes = len(musicos) - len(presencas_evento)
                             col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                             col_s1.metric("✅ Vão",       vao)
