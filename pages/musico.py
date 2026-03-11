@@ -3,7 +3,6 @@ Interface do Músico - Portal BMO
 """
 import streamlit as st
 import time
-import requests
 from helpers import formatar_data_pt, converter_data_robusta
 from seatable_conn import add_presenca
 from datetime import datetime, timedelta
@@ -282,7 +281,6 @@ def render(base, user):
         st.subheader("🖼️ Galeria de Eventos")
 
         def _extrair_file_id(url):
-            """Extrai o file ID de um URL do Google Drive"""
             url = str(url).strip()
             if "drive.google.com/file/d/" in url:
                 try:
@@ -296,40 +294,14 @@ def render(base, user):
                     return None
             return None
 
-        def _carregar_imagem(url):
-            """
-            Tenta carregar a imagem do Google Drive.
-            1ª tentativa: thumbnail URL (mais rápido)
-            2ª tentativa: download direto via requests (mais robusto)
-            """
+        def _url_imagem_direta(url):
+            """Devolve URL que o browser do utilizador consegue carregar diretamente"""
             if not url:
-                return None, url
-
+                return None
             file_id = _extrair_file_id(url)
-
             if file_id:
-                # 1ª tentativa: thumbnail
-                thumb_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
-                try:
-                    resp = requests.get(thumb_url, timeout=8)
-                    if resp.status_code == 200 and "image" in resp.headers.get("Content-Type", ""):
-                        return resp.content, url
-                except Exception:
-                    pass
-
-                # 2ª tentativa: download direto
-                try:
-                    download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
-                    resp = requests.get(download_url, timeout=10, allow_redirects=True)
-                    if resp.status_code == 200 and "image" in resp.headers.get("Content-Type", ""):
-                        return resp.content, url
-                except Exception:
-                    pass
-
-                return None, url
-
-            # URL não é Google Drive — passa diretamente ao st.image
-            return "direct", url
+                return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+            return str(url).strip()
 
         try:
             eventos_gal        = base.list_rows("Eventos")
@@ -341,27 +313,22 @@ def render(base, user):
                 cols = st.columns(3)
                 for i, ev in enumerate(eventos_com_cartaz):
                     with cols[i % 3]:
-                        img_data, url_original = _carregar_imagem(ev['Cartaz'])
-                        try:
-                            if img_data == "direct":
-                                st.image(
-                                    url_original,
-                                    caption=ev.get('Nome do Evento', 'Evento'),
-                                    use_column_width=True
-                                )
-                            elif img_data:
-                                st.image(
-                                    img_data,
-                                    caption=ev.get('Nome do Evento', 'Evento'),
-                                    use_column_width=True
-                                )
-                            else:
-                                st.warning("⚠️ Não foi possível carregar o cartaz")
-                                st.link_button("🔗 Ver Cartaz", url_original, use_container_width=True)
-                        except Exception:
-                            st.warning("⚠️ Não foi possível carregar o cartaz")
-                            st.link_button("🔗 Ver Cartaz", url_original, use_container_width=True)
-                        st.caption(formatar_data_pt(ev.get('Data')))
+                        img_url = _url_imagem_direta(ev['Cartaz'])
+                        nome_ev = ev.get('Nome do Evento', 'Evento')
+                        data_ev = formatar_data_pt(ev.get('Data'))
+
+                        if img_url:
+                            st.markdown(
+                                f'<img src="{img_url}" alt="{nome_ev}" '
+                                f'style="width:100%; border-radius:8px; margin-bottom:4px;">',
+                                unsafe_allow_html=True
+                            )
+                            st.caption(f"{nome_ev}")
+                        else:
+                            st.warning("⚠️ Cartaz indisponível")
+                            st.link_button("🔗 Ver Cartaz", ev['Cartaz'], use_container_width=True)
+
+                        st.caption(data_ev)
 
         except Exception as e:
             st.error(f"Erro ao carregar galeria: {e}")
