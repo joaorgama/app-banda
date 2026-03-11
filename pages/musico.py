@@ -297,7 +297,7 @@ def render(base, user):
     # TAB 7: ANIVERSÁRIOS
     # ========================================
     with t7:
-        st.subheader("🎂 Aniversários Próximos")
+        st.subheader("🎂 Aniversários")
 
         if not musicos:
             st.info("📭 Sem dados de músicos")
