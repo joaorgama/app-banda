@@ -73,7 +73,8 @@ def _get_ensaios_do_mes(ensaios, ano, mes):
                             lista.append(e)
                     except Exception:
                         pass
-            elif tipo in ('Semanal', 'Período'):
+            else:
+                # Semanal, Período ou qualquer outro valor recorrente
                 dia_sem = _sv(e.get('Dia da Semana', ''))
                 if dia_sem not in _DIAS_PT_MAP or _DIAS_PT_MAP[dia_sem] != weekday:
                     continue
@@ -84,14 +85,14 @@ def _get_ensaios_do_mes(ensaios, ano, mes):
                             continue
                     except Exception:
                         pass
-                if tipo == 'Período':
-                    raw_fim = _sv(e.get('Data Fim', ''))
-                    if raw_fim:
-                        try:
-                            if data_dia > datetime.strptime(raw_fim[:10], '%Y-%m-%d').date():
-                                continue
-                        except Exception:
-                            pass
+                # Data Fim verificada SEMPRE que existir, independentemente do tipo
+                raw_fim = _sv(e.get('Data Fim', ''))
+                if raw_fim:
+                    try:
+                        if data_dia > datetime.strptime(raw_fim[:10], '%Y-%m-%d').date():
+                            continue
+                    except Exception:
+                        pass
                 lista.append(e)
         if lista:
             ensaios_por_dia[dia] = lista
@@ -470,44 +471,15 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
 
 
 # ============================================
-# HELPER GALERIA (igual ao musico.py)
-# ============================================
-
-def _extrair_file_id(url):
-    url = str(url).strip()
-    if "drive.google.com/file/d/" in url:
-        try:
-            return url.split("/file/d/")[1].split("/")[0]
-        except Exception:
-            return None
-    if "drive.google.com/open?id=" in url:
-        try:
-            return url.split("open?id=")[1].split("&")[0]
-        except Exception:
-            return None
-    return None
-
-
-def _url_imagem_direta(url):
-    if not url:
-        return None
-    file_id = _extrair_file_id(url)
-    if file_id:
-        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
-    return str(url).strip()
-
-
-# ============================================
 # RENDER PRINCIPAL
 # ============================================
 
 def render(base, user):
     st.title("📊 Painel da Direção")
 
-    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 = st.tabs([
+    t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.tabs([
         "📅 Eventos",
         "🥁 Ensaios",
-        "🖼️ Galeria",
         "🎷 Inventário",
         "🏫 Escola",
         "📊 Status Geral",
@@ -779,46 +751,9 @@ def render(base, user):
             _render_gestao_ensaios(base, ensaios, faltas, musicos)
 
     # ========================================
-    # TAB 3: GALERIA
+    # TAB 3: INVENTÁRIO DE INSTRUMENTOS
     # ========================================
     with t3:
-        st.subheader("🖼️ Galeria de Eventos")
-
-        try:
-            eventos_gal        = base.list_rows("Eventos")
-            eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
-
-            if not eventos_com_cartaz:
-                st.info("📭 Nenhum cartaz disponível no momento")
-            else:
-                st.caption(f"📊 {len(eventos_com_cartaz)} evento(s) com cartaz")
-                cols = st.columns(3)
-                for i, ev in enumerate(eventos_com_cartaz):
-                    with cols[i % 3]:
-                        img_url = _url_imagem_direta(ev['Cartaz'])
-                        nome_ev = ev.get('Nome do Evento', 'Evento')
-                        data_ev = formatar_data_pt(ev.get('Data'))
-
-                        if img_url:
-                            st.markdown(
-                                f'<img src="{img_url}" alt="{nome_ev}" '
-                                f'style="width:100%;border-radius:8px;margin-bottom:4px;">',
-                                unsafe_allow_html=True
-                            )
-                            st.caption(f"**{nome_ev}**")
-                        else:
-                            st.warning("⚠️ Cartaz indisponível")
-                            st.link_button("🔗 Ver Cartaz", ev['Cartaz'], use_container_width=True)
-
-                        st.caption(data_ev)
-
-        except Exception as e:
-            st.error(f"Erro ao carregar galeria: {e}")
-
-    # ========================================
-    # TAB 4: INVENTÁRIO DE INSTRUMENTOS
-    # ========================================
-    with t4:
         st.subheader("🎷 Inventário de Instrumentos")
         try:
             musicos = base.list_rows("Musicos")
@@ -844,9 +779,9 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 5: ESCOLA DE MÚSICA
+    # TAB 4: ESCOLA DE MÚSICA
     # ========================================
-    with t5:
+    with t4:
         st.subheader("🏫 Aulas da Escola")
         try:
             aulas = base.list_rows("Aulas")
@@ -865,9 +800,9 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 6: STATUS GERAL
+    # TAB 5: STATUS GERAL
     # ========================================
-    with t6:
+    with t5:
         st.subheader("📊 Status dos Músicos")
         try:
             musicos = base.list_rows("Musicos")
@@ -896,16 +831,16 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 7: MENSAGENS
+    # TAB 6: MENSAGENS
     # ========================================
-    with t7:
+    with t6:
         from mensagens import render_chat
         render_chat(base, user, pode_apagar=True)
 
     # ========================================
-    # TAB 8: ANIVERSÁRIOS
+    # TAB 7: ANIVERSÁRIOS
     # ========================================
-    with t8:
+    with t7:
         st.subheader("🎂 Aniversários")
         try:
             musicos = base.list_rows("Musicos")
@@ -957,9 +892,9 @@ def render(base, user):
             st.error(f"Erro ao carregar aniversários: {e}")
 
     # ========================================
-    # TAB 9: GESTÃO DE UTILIZADORES
+    # TAB 8: GESTÃO DE UTILIZADORES
     # ========================================
-    with t9:
+    with t8:
         st.subheader("👥 Gestão de Utilizadores")
         st.info("🔧 Ferramentas para manter a tabela de utilizadores sincronizada e limpa")
         col1, col2 = st.columns(2)
@@ -1058,9 +993,9 @@ def render(base, user):
             st.error(f"Erro ao carregar utilizadores: {e}")
 
     # ========================================
-    # TAB 10: GESTÃO DE MÚSICOS
+    # TAB 9: GESTÃO DE MÚSICOS
     # ========================================
-    with t10:
+    with t9:
         st.subheader("👤 Gestão de Músicos")
         st.info("➕ Adicione, edite ou arquive músicos sem precisar aceder às tabelas diretamente.")
 
