@@ -8,7 +8,30 @@ from seatable_conn import add_presenca
 from datetime import datetime, timedelta
 
 def render(base, user):
+
+    # Carregar dados do músico ANTES do título para usar na saudação
+    try:
+        musicos = base.list_rows("Musicos")
+        m_row = next((r for r in musicos if str(r.get('Username', '')).lower() == user['username']), None)
+    except:
+        m_row = None
+        musicos = []
+
+    # Título + saudação personalizada
     st.title("👤 Portal do Músico")
+
+    if m_row:
+        nome_completo = str(m_row.get('Nome', '')).strip()
+        partes = nome_completo.split()
+        if len(partes) >= 2:
+            saudacao = f"{partes[0]} {partes[-1]}"
+        elif partes:
+            saudacao = partes[0]
+        else:
+            saudacao = user['username']
+        st.markdown(f"👋 Olá, **{saudacao}**!")
+    else:
+        st.error("❌ Erro ao carregar dados do músico")
 
     t1, t2, t3, t4, t5, t6, t7 = st.tabs([
         "📅 Agenda",
@@ -19,14 +42,6 @@ def render(base, user):
         "💬 Mensagens",
         "🎂 Aniversários"
     ])
-
-    try:
-        musicos = base.list_rows("Musicos")
-        m_row = next((r for r in musicos if str(r.get('Username', '')).lower() == user['username']), None)
-    except:
-        m_row = None
-        musicos = []
-        st.error("❌ Erro ao carregar dados do músico")
 
     # ========================================
     # TAB 1: AGENDA DE EVENTOS
@@ -41,7 +56,6 @@ def render(base, user):
             if not eventos:
                 st.info("📭 Nenhum evento agendado no momento")
             else:
-                # Ordenar cronologicamente — datas inválidas ficam no fim
                 def _data_sort(ev):
                     try:
                         return datetime.strptime(str(ev.get('Data', ''))[:10], "%Y-%m-%d").date()
@@ -144,9 +158,9 @@ def render(base, user):
                 if st.form_submit_button("💾 Guardar Alterações", use_container_width=True):
                     try:
                         base.update_row("Musicos", m_row['_id'], {
-                            "Telefone": tel,
-                            "Email": mail,
-                            "Morada": mor,
+                            "Telefone":           tel,
+                            "Email":              mail,
+                            "Morada":             mor,
                             "Data de Nascimento": str(nasc)
                         })
                         st.success("✅ Dados atualizados com sucesso!")
@@ -215,10 +229,10 @@ def render(base, user):
                         try:
                             base.update_row("Musicos", m_row['_id'], {
                                 "Instrumento Proprio": prop,
-                                "Instrumento": inst,
-                                "Marca":     marc   if not prop else "",
-                                "Modelo":    modelo if not prop else "",
-                                "Num Serie": seri   if not prop else ""
+                                "Instrumento":         inst,
+                                "Marca":               marc   if not prop else "",
+                                "Modelo":              modelo if not prop else "",
+                                "Num Serie":           seri   if not prop else ""
                             })
                             st.success("✅ Instrumento atualizado!")
                             time.sleep(1)
@@ -267,7 +281,7 @@ def render(base, user):
         st.subheader("🖼️ Galeria de Eventos")
 
         try:
-            eventos_gal = base.list_rows("Eventos")
+            eventos_gal        = base.list_rows("Eventos")
             eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
 
             if not eventos_com_cartaz:
@@ -357,11 +371,8 @@ def render(base, user):
                         st.caption(f"📅 {formatar_data_pt(str(aniv['data_aniversario']))} • {aniv['idade']} anos • 🎷 {aniv['instrumento']}")
 
                     with col2:
-                        if dias == 0:
-                            st.success("HOJE")
-                        elif dias <= 3:
-                            st.warning(f"{dias}d")
-                        else:
-                            st.info(f"{dias}d")
+                        if dias == 0:    st.success("HOJE")
+                        elif dias <= 3:  st.warning(f"{dias}d")
+                        else:            st.info(f"{dias}d")
 
                     st.divider()
