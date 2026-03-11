@@ -182,8 +182,8 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
                          f'<div class="{"adm-num-hoje" if is_hoje else "adm-num"}">{dia}</div>')
                 if dia in ensaios_por_dia:
                     for e in sorted(ensaios_por_dia[dia], key=lambda x: _hora_norm(x.get('Hora', ''))):
-                        hora  = _hora_norm(e.get('Hora', ''))
-                        nome  = _sv(e.get('Nome', 'Ensaio'))
+                        hora     = _hora_norm(e.get('Hora', ''))
+                        nome     = _sv(e.get('Nome', 'Ensaio'))
                         data_str = date(ano, mes, dia).strftime('%Y-%m-%d')
                         n_faltas = sum(
                             1 for f in faltas
@@ -199,7 +199,6 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    # ---- Detalhe do dia ----
     st.divider()
     st.markdown("#### 🔍 Detalhe do Dia")
     dias_lista = sorted(ensaios_por_dia.keys())
@@ -235,7 +234,6 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
                 unsafe_allow_html=True
             )
 
-            # Faltas registadas neste ensaio neste dia
             faltas_dia = [
                 f for f in faltas
                 if _sv(f.get('EnsaioID', '')) == eid
@@ -263,7 +261,6 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
             else:
                 st.success("✅ Sem faltas registadas para este ensaio")
 
-            # Cancelar apenas este dia (para recorrentes)
             if tipo in ('Semanal', 'Período'):
                 cancel_key = f"cancel_dia_{eid}_{data_sel_str}"
                 if st.button(f"🚫 Cancelar ensaio de {dia_sel} {_MESES_PT[mes]}",
@@ -282,9 +279,7 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
 
 def _render_gestao_ensaios(base, ensaios, faltas, musicos):
     """Sub-secção de criação e edição de ensaios"""
-    dark = st.session_state.get('dark_mode', True)
 
-    # ---- Criar novo ensaio ----
     with st.expander("➕ Criar Novo Ensaio", expanded=False):
         with st.form("form_novo_ensaio"):
             col1, col2 = st.columns(2)
@@ -311,13 +306,13 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                     st.error("⚠️ Para ensaios Semanal ou Período é necessário escolher o Dia da Semana")
                 else:
                     dados = {
-                        "Nome":          novo_nome.strip(),
-                        "Tipo":          novo_tipo,
-                        "Hora":          _hora_norm(novo_hora),
-                        "Local":         novo_local.strip(),
-                        "Data":          str(novo_data),
-                        "Dia da Semana": novo_dia if novo_tipo in ('Semanal', 'Período') else "",
-                        "Data Fim":      str(novo_data_fim) if novo_tipo == 'Período' else "",
+                        "Nome":             novo_nome.strip(),
+                        "Tipo":             novo_tipo,
+                        "Hora":             _hora_norm(novo_hora),
+                        "Local":            novo_local.strip(),
+                        "Data":             str(novo_data),
+                        "Dia da Semana":    novo_dia if novo_tipo in ('Semanal', 'Período') else "",
+                        "Data Fim":         str(novo_data_fim) if novo_tipo == 'Período' else "",
                         "Datas Canceladas": "",
                     }
                     try:
@@ -329,26 +324,24 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
 
     st.divider()
 
-    # ---- Lista de ensaios existentes ----
     if not ensaios:
         st.info("📭 Nenhum ensaio criado ainda.")
         return
 
     st.markdown(f"**{len(ensaios)} ensaio(s) configurado(s)**")
-
     tipos_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}
 
     for e in ensaios:
-        eid   = _sv(e.get('_id', ''))
-        nome  = _sv(e.get('Nome', 'Ensaio'))
-        tipo  = _sv(e.get('Tipo', 'Pontual'))
-        hora  = _hora_norm(e.get('Hora', ''))
-        local = _sv(e.get('Local', ''))
-        dia   = _sv(e.get('Dia da Semana', ''))
-        data  = _sv(e.get('Data', ''))[:10]
-        dfim  = _sv(e.get('Data Fim', ''))[:10]
+        eid        = _sv(e.get('_id', ''))
+        nome       = _sv(e.get('Nome', 'Ensaio'))
+        tipo       = _sv(e.get('Tipo', 'Pontual'))
+        hora       = _hora_norm(e.get('Hora', ''))
+        local      = _sv(e.get('Local', ''))
+        dia        = _sv(e.get('Dia da Semana', ''))
+        data       = _sv(e.get('Data', ''))[:10]
+        dfim       = _sv(e.get('Data Fim', ''))[:10]
         datas_canc = _datas_canceladas(e)
-        icon  = tipos_icon.get(tipo, '🥁')
+        icon       = tipos_icon.get(tipo, '🥁')
 
         subtitulo = f"{dia} a partir de {data}" if tipo == 'Semanal' else \
                     f"{dia} de {data} a {dfim}"  if tipo == 'Período'  else data
@@ -365,7 +358,8 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                     with ec1:
                         e_nome  = st.text_input("Nome*", value=nome)
                         e_tipo  = st.selectbox("Tipo*", ["Semanal", "Período", "Pontual"],
-                                               index=["Semanal", "Período", "Pontual"].index(tipo) if tipo in ["Semanal", "Período", "Pontual"] else 0)
+                                               index=["Semanal", "Período", "Pontual"].index(tipo)
+                                               if tipo in ["Semanal", "Período", "Pontual"] else 0)
                         e_hora  = st.text_input("Hora*", value=hora)
                         e_local = st.text_input("Local", value=local)
                     with ec2:
@@ -436,7 +430,6 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                         st.session_state[edit_key] = True
                         st.rerun()
 
-                    # Cancelar datas individualmente (só para recorrentes)
                     if tipo in ('Semanal', 'Período') and datas_canc:
                         if st.button("📋 Ver cancelamentos", key=f"ver_canc_{eid}", use_container_width=True):
                             st.session_state[f"show_canc_{eid}"] = not st.session_state.get(f"show_canc_{eid}", False)
@@ -461,7 +454,6 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                             st.session_state[confirm_del_key] = True
                             st.rerun()
 
-                # Mostrar datas canceladas com opção de repor
                 if st.session_state.get(f"show_canc_{eid}", False) and datas_canc:
                     st.markdown("**🚫 Datas Canceladas (clica para repor):**")
                     for dc in sorted(datas_canc):
@@ -478,15 +470,44 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
 
 
 # ============================================
+# HELPER GALERIA (igual ao musico.py)
+# ============================================
+
+def _extrair_file_id(url):
+    url = str(url).strip()
+    if "drive.google.com/file/d/" in url:
+        try:
+            return url.split("/file/d/")[1].split("/")[0]
+        except Exception:
+            return None
+    if "drive.google.com/open?id=" in url:
+        try:
+            return url.split("open?id=")[1].split("&")[0]
+        except Exception:
+            return None
+    return None
+
+
+def _url_imagem_direta(url):
+    if not url:
+        return None
+    file_id = _extrair_file_id(url)
+    if file_id:
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+    return str(url).strip()
+
+
+# ============================================
 # RENDER PRINCIPAL
 # ============================================
 
 def render(base, user):
     st.title("📊 Painel da Direção")
 
-    t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.tabs([
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 = st.tabs([
         "📅 Eventos",
         "🥁 Ensaios",
+        "🖼️ Galeria",
         "🎷 Inventário",
         "🏫 Escola",
         "📊 Status Geral",
@@ -616,9 +637,9 @@ def render(base, user):
                                     st.write(f"**Descrição:** {e.get('Descricao')}")
                             with col2:
                                 pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
-                                vao      = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
-                                nao_vao  = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
-                                talvez   = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
+                                vao       = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
+                                nao_vao   = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
+                                talvez    = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
                                 pendentes = len(musicos) - len(pres_evento)
                                 st.metric("✅ Confirmados", vao)
                                 st.caption(f"❌ Não Vão: {nao_vao} | ❓ Talvez: {talvez} | ⏳ Pendentes: {pendentes}")
@@ -638,8 +659,8 @@ def render(base, user):
 
                             if musicos:
                                 st.subheader("🎼 Presenças por Músico")
-                                pres_evento     = [p for p in presencas if p.get('EventoID') == e['_id']]
-                                respostas_dict  = {}
+                                pres_evento    = [p for p in presencas if p.get('EventoID') == e['_id']]
+                                respostas_dict = {}
                                 for p in pres_evento:
                                     username_p = p.get('Username')
                                     if username_p:
@@ -738,7 +759,6 @@ def render(base, user):
             else:
                 _render_calendario_ensaios_admin(base, ensaios, faltas, musicos)
 
-                # Métricas gerais
                 st.divider()
                 hoje_m = date.today()
                 total_faltas_mes = sum(
@@ -759,9 +779,46 @@ def render(base, user):
             _render_gestao_ensaios(base, ensaios, faltas, musicos)
 
     # ========================================
-    # TAB 3: INVENTÁRIO DE INSTRUMENTOS
+    # TAB 3: GALERIA
     # ========================================
     with t3:
+        st.subheader("🖼️ Galeria de Eventos")
+
+        try:
+            eventos_gal        = base.list_rows("Eventos")
+            eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
+
+            if not eventos_com_cartaz:
+                st.info("📭 Nenhum cartaz disponível no momento")
+            else:
+                st.caption(f"📊 {len(eventos_com_cartaz)} evento(s) com cartaz")
+                cols = st.columns(3)
+                for i, ev in enumerate(eventos_com_cartaz):
+                    with cols[i % 3]:
+                        img_url = _url_imagem_direta(ev['Cartaz'])
+                        nome_ev = ev.get('Nome do Evento', 'Evento')
+                        data_ev = formatar_data_pt(ev.get('Data'))
+
+                        if img_url:
+                            st.markdown(
+                                f'<img src="{img_url}" alt="{nome_ev}" '
+                                f'style="width:100%;border-radius:8px;margin-bottom:4px;">',
+                                unsafe_allow_html=True
+                            )
+                            st.caption(f"**{nome_ev}**")
+                        else:
+                            st.warning("⚠️ Cartaz indisponível")
+                            st.link_button("🔗 Ver Cartaz", ev['Cartaz'], use_container_width=True)
+
+                        st.caption(data_ev)
+
+        except Exception as e:
+            st.error(f"Erro ao carregar galeria: {e}")
+
+    # ========================================
+    # TAB 4: INVENTÁRIO DE INSTRUMENTOS
+    # ========================================
+    with t4:
         st.subheader("🎷 Inventário de Instrumentos")
         try:
             musicos = base.list_rows("Musicos")
@@ -787,9 +844,9 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 4: ESCOLA DE MÚSICA
+    # TAB 5: ESCOLA DE MÚSICA
     # ========================================
-    with t4:
+    with t5:
         st.subheader("🏫 Aulas da Escola")
         try:
             aulas = base.list_rows("Aulas")
@@ -808,9 +865,9 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 5: STATUS GERAL
+    # TAB 6: STATUS GERAL
     # ========================================
-    with t5:
+    with t6:
         st.subheader("📊 Status dos Músicos")
         try:
             musicos = base.list_rows("Musicos")
@@ -839,16 +896,16 @@ def render(base, user):
             st.error(f"Erro: {e}")
 
     # ========================================
-    # TAB 6: MENSAGENS
+    # TAB 7: MENSAGENS
     # ========================================
-    with t6:
+    with t7:
         from mensagens import render_chat
         render_chat(base, user, pode_apagar=True)
 
     # ========================================
-    # TAB 7: ANIVERSÁRIOS
+    # TAB 8: ANIVERSÁRIOS
     # ========================================
-    with t7:
+    with t8:
         st.subheader("🎂 Aniversários")
         try:
             musicos = base.list_rows("Musicos")
@@ -900,9 +957,9 @@ def render(base, user):
             st.error(f"Erro ao carregar aniversários: {e}")
 
     # ========================================
-    # TAB 8: GESTÃO DE UTILIZADORES
+    # TAB 9: GESTÃO DE UTILIZADORES
     # ========================================
-    with t8:
+    with t9:
         st.subheader("👥 Gestão de Utilizadores")
         st.info("🔧 Ferramentas para manter a tabela de utilizadores sincronizada e limpa")
         col1, col2 = st.columns(2)
@@ -1001,9 +1058,9 @@ def render(base, user):
             st.error(f"Erro ao carregar utilizadores: {e}")
 
     # ========================================
-    # TAB 9: GESTÃO DE MÚSICOS
+    # TAB 10: GESTÃO DE MÚSICOS
     # ========================================
-    with t9:
+    with t10:
         st.subheader("👤 Gestão de Músicos")
         st.info("➕ Adicione, edite ou arquive músicos sem precisar aceder às tabelas diretamente.")
 
@@ -1146,7 +1203,7 @@ def render(base, user):
                                                 "Morada":              edit_morada.strip(),
                                                 "Instrumento":         edit_instrumento.strip(),
                                                 "Obs":                 edit_obs.strip(),
-                                                "Data de Nascimento":  str(edit_nasc)    if edit_nasc    else "",
+                                                "Data de Nascimento":  str(edit_nasc)     if edit_nasc     else "",
                                                 "Data Ingresso Banda": str(edit_ingresso) if edit_ingresso else "",
                                             })
                                             st.session_state[edit_key_m] = False
