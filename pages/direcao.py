@@ -7,9 +7,8 @@ from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta
 
 def render(base, user):
-    """Renderiza interface da direção"""
     st.title("📊 Painel da Direção")
-    
+
     t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
         "📅 Eventos",
         "🎷 Inventário",
@@ -26,7 +25,7 @@ def render(base, user):
     # ========================================
     with t1:
         st.subheader("📅 Gestão de Eventos")
-        
+
         with st.expander("➕ Criar Novo Evento", expanded=False):
             with st.form("novo_evento"):
                 col1, col2 = st.columns(2)
@@ -34,11 +33,11 @@ def render(base, user):
                     nome = st.text_input("Nome do Evento*", placeholder="Ex: Concerto de Natal")
                     data = st.date_input("Data*", min_value=datetime.now())
                 with col2:
-                    hora = st.text_input("Hora*", placeholder="Ex: 21:00")
-                    tipo = st.selectbox("Tipo", ["Concerto", "Ensaio", "Actuação", "Outro"])
-                descricao = st.text_area("Descrição", placeholder="Descrição do evento...")
+                    hora       = st.text_input("Hora*", placeholder="Ex: 21:00")
+                    tipo       = st.selectbox("Tipo", ["Concerto", "Ensaio", "Actuação", "Outro"])
+                descricao  = st.text_area("Descrição", placeholder="Descrição do evento...")
                 cartaz_url = st.text_input("URL do Cartaz", placeholder="https://...")
-                
+
                 if st.form_submit_button("✅ Criar Evento", use_container_width=True):
                     if not nome or not data or not hora:
                         st.error("⚠️ Preencha todos os campos obrigatórios")
@@ -46,41 +45,50 @@ def render(base, user):
                         try:
                             base.append_row("Eventos", {
                                 "Nome do Evento": nome,
-                                "Data": str(data),
-                                "Hora": hora,
-                                "Tipo": tipo,
-                                "Descricao": descricao,
-                                "Cartaz": cartaz_url
+                                "Data":           str(data),
+                                "Hora":           hora,
+                                "Tipo":           tipo,
+                                "Descricao":      descricao,
+                                "Cartaz":         cartaz_url
                             })
                             st.success(f"✅ Evento **{nome}** criado!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro: {e}")
-        
+
         st.divider()
-        
+
         try:
-            eventos = base.list_rows("Eventos")
+            eventos   = base.list_rows("Eventos")
             presencas = base.list_rows("Presencas")
-            musicos = base.list_rows("Musicos")
-            
+            musicos   = base.list_rows("Musicos")
+
             if not eventos:
                 st.info("📭 Nenhum evento criado")
             else:
+                # Ordenar cronologicamente — datas inválidas ficam no fim
+                def _data_sort(ev):
+                    try:
+                        return datetime.strptime(str(ev.get('Data', ''))[:10], "%Y-%m-%d").date()
+                    except Exception:
+                        return datetime.max.date()
+
+                eventos = sorted(eventos, key=_data_sort)
+
                 st.write(f"**Total de eventos:** {len(eventos)}")
-                
+
                 for e in eventos:
                     with st.expander(f"📝 {e.get('Nome do Evento')} - {formatar_data_pt(e.get('Data'))}"):
                         edit_key = f"edit_mode_{e['_id']}"
                         if edit_key not in st.session_state:
                             st.session_state[edit_key] = False
-                        
+
                         if st.session_state[edit_key]:
                             st.markdown("#### ✏️ Editar Evento")
                             with st.form(f"form_edit_{e['_id']}"):
                                 col1, col2 = st.columns(2)
                                 with col1:
-                                    nome_edit = st.text_input("Nome do Evento*", value=e.get('Nome do Evento', ''))
+                                    nome_edit  = st.text_input("Nome do Evento*", value=e.get('Nome do Evento', ''))
                                     data_atual = e.get('Data', '')
                                     try:
                                         data_obj = datetime.strptime(str(data_atual)[:10], '%Y-%m-%d').date() if data_atual else datetime.now().date()
@@ -88,20 +96,20 @@ def render(base, user):
                                         data_obj = datetime.now().date()
                                     data_edit = st.date_input("Data*", value=data_obj)
                                 with col2:
-                                    hora_edit = st.text_input("Hora*", value=e.get('Hora', ''))
-                                    tipos = ["Concerto", "Ensaio", "Actuação", "Outro"]
+                                    hora_edit  = st.text_input("Hora*", value=e.get('Hora', ''))
+                                    tipos      = ["Concerto", "Ensaio", "Actuação", "Outro"]
                                     tipo_atual = e.get('Tipo', 'Concerto')
-                                    tipo_idx = tipos.index(tipo_atual) if tipo_atual in tipos else 0
-                                    tipo_edit = st.selectbox("Tipo", tipos, index=tipo_idx)
+                                    tipo_idx   = tipos.index(tipo_atual) if tipo_atual in tipos else 0
+                                    tipo_edit  = st.selectbox("Tipo", tipos, index=tipo_idx)
                                 descricao_edit = st.text_area("Descrição", value=e.get('Descricao', ''))
-                                cartaz_edit = st.text_input("URL do Cartaz", value=e.get('Cartaz', ''))
-                                
+                                cartaz_edit    = st.text_input("URL do Cartaz", value=e.get('Cartaz', ''))
+
                                 col_save, col_cancel = st.columns(2)
                                 with col_save:
-                                    guardar = st.form_submit_button("💾 Guardar Alterações", use_container_width=True, type="primary")
+                                    guardar  = st.form_submit_button("💾 Guardar Alterações", use_container_width=True, type="primary")
                                 with col_cancel:
                                     cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
-                                
+
                                 if guardar:
                                     if not nome_edit or not hora_edit:
                                         st.error("⚠️ Preencha todos os campos obrigatórios")
@@ -109,11 +117,11 @@ def render(base, user):
                                         try:
                                             base.update_row("Eventos", e['_id'], {
                                                 "Nome do Evento": nome_edit,
-                                                "Data": str(data_edit),
-                                                "Hora": hora_edit,
-                                                "Tipo": tipo_edit,
-                                                "Descricao": descricao_edit,
-                                                "Cartaz": cartaz_edit
+                                                "Data":           str(data_edit),
+                                                "Hora":           hora_edit,
+                                                "Tipo":           tipo_edit,
+                                                "Descricao":      descricao_edit,
+                                                "Cartaz":         cartaz_edit
                                             })
                                             st.session_state[edit_key] = False
                                             st.success("✅ Evento atualizado!")
@@ -123,6 +131,7 @@ def render(base, user):
                                 if cancelar:
                                     st.session_state[edit_key] = False
                                     st.rerun()
+
                         else:
                             col1, col2, col3 = st.columns([2, 2, 1])
                             with col1:
@@ -133,9 +142,9 @@ def render(base, user):
                                     st.write(f"**Descrição:** {e.get('Descricao')}")
                             with col2:
                                 pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
-                                vao = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
-                                nao_vao = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
-                                talvez = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
+                                vao      = len([p for p in pres_evento if p.get('Resposta') == 'Vou'])
+                                nao_vao  = len([p for p in pres_evento if p.get('Resposta') == 'Não Vou'])
+                                talvez   = len([p for p in pres_evento if p.get('Resposta') == 'Talvez'])
                                 pendentes = len(musicos) - len(pres_evento)
                                 st.metric("✅ Confirmados", vao)
                                 st.caption(f"❌ Não Vão: {nao_vao} | ❓ Talvez: {talvez} | ⏳ Pendentes: {pendentes}")
@@ -150,32 +159,32 @@ def render(base, user):
                                         st.rerun()
                                     except Exception as e_error:
                                         st.error(f"Erro: {e_error}")
-                            
+
                             st.divider()
-                            
+
                             if musicos:
                                 st.subheader("🎼 Presenças por Músico")
-                                pres_evento = [p for p in presencas if p.get('EventoID') == e['_id']]
-                                respostas_dict = {}
+                                pres_evento     = [p for p in presencas if p.get('EventoID') == e['_id']]
+                                respostas_dict  = {}
                                 for p in pres_evento:
                                     username_p = p.get('Username')
                                     if username_p:
                                         respostas_dict[str(username_p).lower().strip()] = p.get('Resposta')
-                                
+
                                 lista_musicos = []
                                 for m in musicos:
-                                    username_raw = m.get('Username')
-                                    username = str(username_raw).lower().strip() if username_raw and str(username_raw).strip() else str(m.get('Nome', '')).lower().strip()
+                                    username_raw  = m.get('Username')
+                                    username      = str(username_raw).lower().strip() if username_raw and str(username_raw).strip() else str(m.get('Nome', '')).lower().strip()
                                     instrumento_raw = m.get('Instrumento')
-                                    instrumento = str(instrumento_raw).strip() if instrumento_raw and str(instrumento_raw).strip() else "Não definido"
+                                    instrumento   = str(instrumento_raw).strip() if instrumento_raw and str(instrumento_raw).strip() else "Não definido"
                                     lista_musicos.append({
-                                        'Nome': m.get('Nome', 'Desconhecido'),
+                                        'Nome':       m.get('Nome', 'Desconhecido'),
                                         'Instrumento': instrumento,
-                                        'Resposta': respostas_dict.get(username, 'Pendente')
+                                        'Resposta':   respostas_dict.get(username, 'Pendente')
                                     })
-                                
+
                                 df_musicos = pd.DataFrame(lista_musicos).sort_values(['Instrumento', 'Nome'])
-                                
+
                                 col_filtro1, col_filtro2 = st.columns([2, 2])
                                 with col_filtro1:
                                     filtro_resposta = st.multiselect(
@@ -185,26 +194,26 @@ def render(base, user):
                                         key=f"filtro_resp_{e['_id']}"
                                     )
                                 with col_filtro2:
-                                    inst_def = df_musicos[df_musicos['Instrumento'] != 'Não definido']
+                                    inst_def   = df_musicos[df_musicos['Instrumento'] != 'Não definido']
                                     num_naipes = len(inst_def['Instrumento'].unique()) if not inst_def.empty else 0
                                     st.caption(f"📊 Naipes definidos: {num_naipes}")
-                                
+
                                 df_filtrado = df_musicos[df_musicos['Resposta'].isin(filtro_resposta)].copy()
-                                
+
                                 def add_emoji(r):
                                     return {'Vou': '✅ Vou', 'Não Vou': '❌ Não Vou', 'Talvez': '❓ Talvez'}.get(r, '⏳ Pendente')
-                                
+
                                 df_filtrado['Estado'] = df_filtrado['Resposta'].apply(add_emoji)
                                 st.dataframe(
                                     df_filtrado[['Nome', 'Instrumento', 'Estado']],
                                     use_container_width=True, hide_index=True,
                                     column_config={
-                                        "Nome": st.column_config.TextColumn("👤 Músico", width="medium"),
+                                        "Nome":        st.column_config.TextColumn("👤 Músico",      width="medium"),
                                         "Instrumento": st.column_config.TextColumn("🎷 Instrumento", width="medium"),
-                                        "Estado": st.column_config.TextColumn("📋 Resposta", width="medium")
+                                        "Estado":      st.column_config.TextColumn("📋 Resposta",    width="medium")
                                     }
                                 )
-                                
+
                                 instrumentos_validos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
                                 if not instrumentos_validos.empty:
                                     st.divider()
@@ -213,11 +222,11 @@ def render(base, user):
                                     for inst in sorted(instrumentos_validos['Instrumento'].unique()):
                                         df_inst = df_musicos[df_musicos['Instrumento'] == inst]
                                         naipes_stats.append({
-                                            'Naipe': inst,
-                                            'Total': len(df_inst),
-                                            '✅ Vão': len(df_inst[df_inst['Resposta'] == 'Vou']),
-                                            '❌ Não Vão': len(df_inst[df_inst['Resposta'] == 'Não Vou']),
-                                            '❓ Talvez': len(df_inst[df_inst['Resposta'] == 'Talvez']),
+                                            'Naipe':        inst,
+                                            'Total':        len(df_inst),
+                                            '✅ Vão':       len(df_inst[df_inst['Resposta'] == 'Vou']),
+                                            '❌ Não Vão':   len(df_inst[df_inst['Resposta'] == 'Não Vou']),
+                                            '❓ Talvez':    len(df_inst[df_inst['Resposta'] == 'Talvez']),
                                             '⏳ Pendentes': len(df_inst[df_inst['Resposta'] == 'Pendente'])
                                         })
                                     if naipes_stats:
@@ -230,6 +239,7 @@ def render(base, user):
                                     st.info("ℹ️ Os músicos ainda não têm instrumentos definidos.")
                             else:
                                 st.info("Nenhum músico registado no sistema")
+
         except Exception as e:
             st.error(f"❌ Erro ao carregar eventos: {str(e)}")
 
@@ -247,12 +257,12 @@ def render(base, user):
                 if 'Instrumento' in df_mus.columns:
                     col1, col2, col3 = st.columns(3)
                     total_inst = df_mus['Instrumento'].notna().sum()
-                    proprios = df_mus['Instrumento Proprio'].sum() if 'Instrumento Proprio' in df_mus.columns else 0
+                    proprios   = df_mus['Instrumento Proprio'].sum() if 'Instrumento Proprio' in df_mus.columns else 0
                     col1.metric("Total Instrumentos", total_inst)
                     col2.metric("Próprios", proprios)
                     col3.metric("Da Banda", total_inst - proprios)
                     st.divider()
-                    colunas_mostrar = ['Nome', 'Instrumento', 'Marca', 'Modelo', 'Num Serie']
+                    colunas_mostrar    = ['Nome', 'Instrumento', 'Marca', 'Modelo', 'Num Serie']
                     colunas_existentes = [c for c in colunas_mostrar if c in df_mus.columns]
                     if colunas_existentes:
                         st.dataframe(df_mus[colunas_existentes], use_container_width=True, hide_index=True)
@@ -296,18 +306,18 @@ def render(base, user):
                 for m in musicos:
                     campos = sum([bool(m.get('Telefone')), bool(m.get('Email')), bool(m.get('Morada'))])
                     status_list.append({
-                        "Nome": m.get('Nome', '---'),
+                        "Nome":        m.get('Nome', '---'),
                         "📞 Telefone": "✅" if m.get('Telefone') else "❌",
-                        "📧 Email": "✅" if m.get('Email') else "❌",
-                        "🏠 Morada": "✅" if m.get('Morada') else "❌",
-                        "Completude": f"{int((campos / 3) * 100)}%"
+                        "📧 Email":    "✅" if m.get('Email')    else "❌",
+                        "🏠 Morada":   "✅" if m.get('Morada')   else "❌",
+                        "Completude":  f"{int((campos / 3) * 100)}%"
                     })
                 df_status = pd.DataFrame(status_list)
                 completos = len([s for s in status_list if s["Completude"] == "100%"])
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Total Músicos", len(status_list))
+                col1.metric("Total Músicos",     len(status_list))
                 col2.metric("✅ Fichas Completas", completos)
-                col3.metric("⚠️ Incompletas", len(status_list) - completos)
+                col3.metric("⚠️ Incompletas",     len(status_list) - completos)
                 st.divider()
                 st.dataframe(df_status, use_container_width=True, hide_index=True)
         except Exception as e:
@@ -330,7 +340,7 @@ def render(base, user):
             if not musicos:
                 st.info("📭 Sem dados de músicos")
             else:
-                hoje = datetime.now().date()
+                hoje        = datetime.now().date()
                 data_limite = hoje + timedelta(days=15)
                 aniversarios = []
                 for m in musicos:
@@ -348,11 +358,11 @@ def render(base, user):
                             aniv = data_nasc.replace(year=hoje.year + 1, day=28)
                     if hoje <= aniv <= data_limite:
                         aniversarios.append({
-                            'nome': m.get('Nome', 'Desconhecido'),
+                            'nome':             m.get('Nome', 'Desconhecido'),
                             'data_aniversario': aniv,
-                            'dias_faltam': (aniv - hoje).days,
-                            'idade': hoje.year - data_nasc.year,
-                            'instrumento': m.get('Instrumento', 'N/D')
+                            'dias_faltam':      (aniv - hoje).days,
+                            'idade':            hoje.year - data_nasc.year,
+                            'instrumento':      m.get('Instrumento', 'N/D')
                         })
                 aniversarios.sort(key=lambda x: x['dias_faltam'])
                 if not aniversarios:
@@ -367,9 +377,9 @@ def render(base, user):
                             st.markdown(f"{emoji} **{aniv['nome']}** {msg}")
                             st.caption(f"📅 {formatar_data_pt(str(aniv['data_aniversario']))} • {aniv['idade']} anos • 🎷 {aniv['instrumento']}")
                         with col2:
-                            if dias == 0: st.success("HOJE")
-                            elif dias <= 3: st.warning(f"{dias}d")
-                            else: st.info(f"{dias}d")
+                            if dias == 0:    st.success("HOJE")
+                            elif dias <= 3:  st.warning(f"{dias}d")
+                            else:            st.info(f"{dias}d")
                         st.divider()
         except Exception as e:
             st.error(f"Erro ao carregar aniversários: {e}")
@@ -426,9 +436,9 @@ def render(base, user):
                     else:
                         status_pass = "❓ Desconhecida"
                     users_list.append({
-                        "Nome": u.get('Nome', '---'),
+                        "Nome":     u.get('Nome', '---'),
                         "Username": u.get('Username', '---'),
-                        "Função": u.get('Funcao', '---'),
+                        "Função":   u.get('Funcao', '---'),
                         "Password": status_pass
                     })
                 df_users = pd.DataFrame(users_list)
@@ -442,9 +452,9 @@ def render(base, user):
                 st.dataframe(
                     df_users, use_container_width=True, hide_index=True,
                     column_config={
-                        "Nome": st.column_config.TextColumn("👤 Nome", width="large"),
+                        "Nome":     st.column_config.TextColumn("👤 Nome",     width="large"),
                         "Username": st.column_config.TextColumn("🔑 Username", width="medium"),
-                        "Função": st.column_config.TextColumn("🎭 Função", width="small"),
+                        "Função":   st.column_config.TextColumn("🎭 Função",   width="small"),
                         "Password": st.column_config.TextColumn("🔐 Password", width="medium")
                     }
                 )
@@ -455,7 +465,7 @@ def render(base, user):
                 st.caption("A nova password será '1234' e o utilizador será obrigado a mudá-la no próximo login.")
                 col_reset1, col_reset2 = st.columns([3, 1])
                 with col_reset1:
-                    users_nomes = [f"{u.get('Nome')} ({u.get('Username')})" for u in utilizadores]
+                    users_nomes    = [f"{u.get('Nome')} ({u.get('Username')})" for u in utilizadores]
                     user_selecionado = st.selectbox(
                         "Selecione o utilizador:",
                         options=range(len(utilizadores)),
@@ -476,31 +486,27 @@ def render(base, user):
             st.error(f"Erro ao carregar utilizadores: {e}")
 
     # ========================================
-    # TAB 8: GESTÃO DE MÚSICOS ← NOVO
+    # TAB 8: GESTÃO DE MÚSICOS
     # ========================================
     with t8:
         st.subheader("👤 Gestão de Músicos")
         st.info("➕ Adicione, edite ou arquive músicos sem precisar aceder às tabelas diretamente.")
 
-        # ----------------------------------------
-        # FORMULÁRIO: ADICIONAR NOVO MÚSICO
-        # ----------------------------------------
         with st.expander("➕ Adicionar Novo Músico", expanded=False):
             with st.form("form_novo_musico"):
                 st.markdown("#### Dados Pessoais")
                 col1, col2 = st.columns(2)
                 with col1:
-                    novo_nome = st.text_input("Nome Completo*", placeholder="Ex: João Silva")
-                    novo_telefone = st.text_input("Telefone", placeholder="Ex: 912345678")
-                    novo_email = st.text_input("Email", placeholder="Ex: joao@email.com")
-                    novo_morada = st.text_input("Morada", placeholder="Ex: Lisboa")
+                    novo_nome      = st.text_input("Nome Completo*", placeholder="Ex: João Silva")
+                    novo_telefone  = st.text_input("Telefone", placeholder="Ex: 912345678")
+                    novo_email     = st.text_input("Email", placeholder="Ex: joao@email.com")
+                    novo_morada    = st.text_input("Morada", placeholder="Ex: Lisboa")
                 with col2:
                     novo_nascimento = st.date_input(
                         "Data de Nascimento",
                         value=None,
                         min_value=datetime(1920, 1, 1).date(),
-                        max_value=datetime.now().date(),
-                        help="Data de nascimento do músico"
+                        max_value=datetime.now().date()
                     )
                     novo_ingresso = st.date_input(
                         "Data de Ingresso na Banda",
@@ -509,7 +515,7 @@ def render(base, user):
                         max_value=datetime.now().date()
                     )
                     novo_instrumento = st.text_input("Instrumento", placeholder="Ex: Clarinete")
-                    novo_obs = st.text_area("Observações", placeholder="Notas adicionais...", height=80)
+                    novo_obs         = st.text_area("Observações", placeholder="Notas adicionais...", height=80)
 
                 st.markdown("---")
                 if st.form_submit_button("✅ Adicionar Músico", use_container_width=True, type="primary"):
@@ -518,18 +524,17 @@ def render(base, user):
                     else:
                         try:
                             dados_musico = {
-                                "Nome": novo_nome.strip(),
-                                "Telefone": novo_telefone.strip() if novo_telefone else "",
-                                "Email": novo_email.strip() if novo_email else "",
-                                "Morada": novo_morada.strip() if novo_morada else "",
+                                "Nome":        novo_nome.strip(),
+                                "Telefone":    novo_telefone.strip()  if novo_telefone  else "",
+                                "Email":       novo_email.strip()     if novo_email     else "",
+                                "Morada":      novo_morada.strip()    if novo_morada    else "",
                                 "Instrumento": novo_instrumento.strip() if novo_instrumento else "",
-                                "Obs": novo_obs.strip() if novo_obs else "",
+                                "Obs":         novo_obs.strip()       if novo_obs       else "",
                             }
                             if novo_nascimento:
-                                dados_musico["Data de Nascimento"] = str(novo_nascimento)
+                                dados_musico["Data de Nascimento"]  = str(novo_nascimento)
                             if novo_ingresso:
                                 dados_musico["Data Ingresso Banda"] = str(novo_ingresso)
-                            
                             base.append_row("Musicos", dados_musico)
                             st.success(f"✅ Músico **{novo_nome}** adicionado com sucesso!")
                             st.info("💡 Lembra-te de ir a **Utilizadores → Sincronizar Músicos** para criar a conta de acesso.")
@@ -539,29 +544,20 @@ def render(base, user):
 
         st.divider()
 
-        # ----------------------------------------
-        # LISTA DE MÚSICOS COM EDIÇÃO
-        # ----------------------------------------
         try:
             musicos = base.list_rows("Musicos")
-
             if not musicos:
                 st.info("📭 Nenhum músico registado")
             else:
-                # Métricas
                 col1, col2, col3 = st.columns(3)
                 col1.metric("👥 Total de Músicos", len(musicos))
                 com_instrumento = len([m for m in musicos if m.get('Instrumento')])
                 col2.metric("🎷 Com Instrumento", com_instrumento)
-                sem_instrumento = len(musicos) - com_instrumento
-                col3.metric("⚠️ Sem Instrumento", sem_instrumento)
+                col3.metric("⚠️ Sem Instrumento", len(musicos) - com_instrumento)
 
                 st.divider()
 
-                # Pesquisa rápida
                 pesquisa = st.text_input("🔍 Pesquisar músico", placeholder="Nome ou instrumento...")
-
-                # Filtrar por pesquisa
                 musicos_filtrados = musicos
                 if pesquisa.strip():
                     termo = pesquisa.strip().lower()
@@ -577,24 +573,22 @@ def render(base, user):
                 for m in musicos_filtrados:
                     musico_nome = m.get('Nome', 'Sem nome')
                     musico_inst = m.get('Instrumento', '---')
-                    
+
                     with st.expander(f"🎵 {musico_nome} — {musico_inst}"):
                         edit_key_m = f"edit_musico_{m['_id']}"
                         if edit_key_m not in st.session_state:
                             st.session_state[edit_key_m] = False
 
-                        # ---- MODO EDIÇÃO ----
                         if st.session_state[edit_key_m]:
                             st.markdown("#### ✏️ Editar Músico")
                             with st.form(f"form_edit_musico_{m['_id']}"):
                                 col1, col2 = st.columns(2)
                                 with col1:
-                                    edit_nome = st.text_input("Nome Completo*", value=m.get('Nome', ''))
+                                    edit_nome     = st.text_input("Nome Completo*", value=m.get('Nome', ''))
                                     edit_telefone = st.text_input("Telefone", value=str(m.get('Telefone', '') or ''))
-                                    edit_email = st.text_input("Email", value=str(m.get('Email', '') or ''))
-                                    edit_morada = st.text_input("Morada", value=str(m.get('Morada', '') or ''))
+                                    edit_email    = st.text_input("Email",    value=str(m.get('Email', '')    or ''))
+                                    edit_morada   = st.text_input("Morada",   value=str(m.get('Morada', '')   or ''))
                                 with col2:
-                                    # Data nascimento
                                     nasc_raw = m.get('Data de Nascimento')
                                     try:
                                         nasc_val = datetime.strptime(str(nasc_raw)[:10], '%Y-%m-%d').date() if nasc_raw else None
@@ -606,24 +600,23 @@ def render(base, user):
                                         min_value=datetime(1920, 1, 1).date(),
                                         max_value=datetime.now().date()
                                     )
-                                    # Data ingresso
                                     ing_raw = m.get('Data Ingresso Banda')
                                     try:
                                         ing_val = datetime.strptime(str(ing_raw)[:10], '%Y-%m-%d').date() if ing_raw else datetime.now().date()
                                     except Exception:
                                         ing_val = datetime.now().date()
-                                    edit_ingresso = st.date_input(
+                                    edit_ingresso    = st.date_input(
                                         "Data de Ingresso",
                                         value=ing_val,
                                         min_value=datetime(1900, 1, 1).date(),
                                         max_value=datetime.now().date()
                                     )
-                                    edit_instrumento = st.text_input("Instrumento", value=str(m.get('Instrumento', '') or ''))
-                                    edit_obs = st.text_area("Observações", value=str(m.get('Obs', '') or ''), height=80)
+                                    edit_instrumento = st.text_input("Instrumento",  value=str(m.get('Instrumento', '') or ''))
+                                    edit_obs         = st.text_area("Observações",   value=str(m.get('Obs', '')         or ''), height=80)
 
                                 col_s, col_c = st.columns(2)
                                 with col_s:
-                                    guardar_m = st.form_submit_button("💾 Guardar", use_container_width=True, type="primary")
+                                    guardar_m  = st.form_submit_button("💾 Guardar", use_container_width=True, type="primary")
                                 with col_c:
                                     cancelar_m = st.form_submit_button("❌ Cancelar", use_container_width=True)
 
@@ -632,17 +625,16 @@ def render(base, user):
                                         st.error("⚠️ O nome é obrigatório")
                                     else:
                                         try:
-                                            dados_update = {
-                                                "Nome": edit_nome.strip(),
-                                                "Telefone": edit_telefone.strip(),
-                                                "Email": edit_email.strip(),
-                                                "Morada": edit_morada.strip(),
-                                                "Instrumento": edit_instrumento.strip(),
-                                                "Obs": edit_obs.strip(),
-                                                "Data de Nascimento": str(edit_nasc) if edit_nasc else "",
+                                            base.update_row("Musicos", m['_id'], {
+                                                "Nome":               edit_nome.strip(),
+                                                "Telefone":           edit_telefone.strip(),
+                                                "Email":              edit_email.strip(),
+                                                "Morada":             edit_morada.strip(),
+                                                "Instrumento":        edit_instrumento.strip(),
+                                                "Obs":                edit_obs.strip(),
+                                                "Data de Nascimento": str(edit_nasc)    if edit_nasc    else "",
                                                 "Data Ingresso Banda": str(edit_ingresso) if edit_ingresso else "",
-                                            }
-                                            base.update_row("Musicos", m['_id'], dados_update)
+                                            })
                                             st.session_state[edit_key_m] = False
                                             st.success("✅ Músico atualizado!")
                                             st.rerun()
@@ -652,7 +644,6 @@ def render(base, user):
                                     st.session_state[edit_key_m] = False
                                     st.rerun()
 
-                        # ---- MODO VISUALIZAÇÃO ----
                         else:
                             col1, col2, col3 = st.columns([3, 3, 1])
                             with col1:
@@ -661,7 +652,7 @@ def render(base, user):
                                 st.write(f"**🏠 Morada:** {m.get('Morada') or '---'}")
                             with col2:
                                 nasc = converter_data_robusta(m.get('Data de Nascimento'))
-                                ing = converter_data_robusta(m.get('Data Ingresso Banda'))
+                                ing  = converter_data_robusta(m.get('Data Ingresso Banda'))
                                 st.write(f"**🎂 Nascimento:** {formatar_data_pt(str(nasc)) if nasc else '---'}")
                                 st.write(f"**📅 Ingresso:** {formatar_data_pt(str(ing)) if ing else '---'}")
                                 st.write(f"**🎷 Instrumento:** {m.get('Instrumento') or '---'}")
