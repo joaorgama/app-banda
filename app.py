@@ -151,6 +151,36 @@ if not base:
     st.stop()
 
 # ============================================
+# CACHES DE LEITURA (evitar 429)
+# ============================================
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_utilizadores_cached(_ignored):
+    return base.list_rows("Utilizadores")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_musicos_cached(_ignored):
+    return base.list_rows("Musicos")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_eventos_cached(_ignored):
+    return base.list_rows("Eventos")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_presencas_cached(_ignored):
+    return base.list_rows("Presencas")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_aulas_cached(_ignored):
+    return base.list_rows("Aulas")
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_faltas_ensaios_cached(_ignored):
+    return base.list_rows("Faltas_Ensaios")
+
+# Nota: Ensaios NÃO é cacheado aqui porque o calendário precisa de dados sempre frescos.
+
+# ============================================
 # APLICAR TEMA (SEMPRE, EM CADA RERUN)
 # ============================================
 
@@ -261,7 +291,8 @@ if not st.session_state['auth_status']:
                     st.error("⚠️ Preencha todos os campos")
                 else:
                     try:
-                        users_list = base.list_rows("Utilizadores")
+                        # usa cache para evitar 429
+                        users_list = get_utilizadores_cached(base)
                         df_users = pd.DataFrame(users_list) if users_list else pd.DataFrame()
 
                         if df_users.empty:
@@ -320,6 +351,9 @@ if not st.session_state['auth_status']:
 else:
     user = st.session_state['user_info']
     try:
+        # As páginas internas continuam a usar base diretamente.
+        # Dentro de cada módulo (musico, maestro, direcao, professor),
+        # podes substituir list_rows por estas funções cacheadas onde fizer sentido.
         if user['role'] == "Musico":
             musico.render(base, user)
         elif user['role'] == "Professor":
