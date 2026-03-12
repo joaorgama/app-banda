@@ -3,6 +3,12 @@ Interface do Maestro - Portal BMO
 """
 import streamlit as st
 import pandas as pd
+from app import (
+    get_musicos_cached,
+    get_eventos_cached,
+    get_presencas_cached,
+    get_faltas_ensaios_cached
+)
 import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta, date
@@ -638,9 +644,9 @@ def render(base, user):
         st.subheader("📅 Eventos Agendados")
 
         try:
-            eventos   = base.list_rows("Eventos")
-            presencas = base.list_rows("Presencas")
-            musicos   = base.list_rows("Musicos")
+            eventos   = get_eventos_cached()
+            presencas = get_presencas_cached()
+            musicos   = get_musicos_cached()
 
             if not eventos:
                 st.info("📭 Nenhum evento agendado")
@@ -782,8 +788,8 @@ def render(base, user):
 
         try:
             ensaios = base.list_rows("Ensaios")
-            faltas  = base.list_rows("Faltas_Ensaios")
-            musicos = base.list_rows("Musicos")
+            faltas  = get_faltas_ensaios_cached()
+            musicos = get_musicos_cached()
         except Exception as ex:
             st.error(f"Erro ao carregar ensaios: {ex}")
             ensaios, faltas, musicos = [], [], []
@@ -806,7 +812,7 @@ def render(base, user):
         st.subheader("🖼️ Galeria de Eventos")
 
         try:
-            eventos_gal        = base.list_rows("Eventos")
+            eventos_gal        = get_eventos_cached()
             eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
 
             if not eventos_com_cartaz:
@@ -835,7 +841,7 @@ def render(base, user):
         st.subheader("🎂 Aniversários")
 
         try:
-            musicos = base.list_rows("Musicos")
+            musicos = get_musicos_cached()
 
             if not musicos:
                 st.info("📭 Sem dados de músicos")
