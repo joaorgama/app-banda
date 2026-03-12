@@ -3,6 +3,14 @@ Interface da Direção - Portal BMO
 """
 import streamlit as st
 import pandas as pd
+from app import (
+    get_musicos_cached,
+    get_eventos_cached,
+    get_presencas_cached,
+    get_faltas_ensaios_cached,
+    get_aulas_cached,
+    get_utilizadores_cached
+)
 import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta, date
@@ -520,6 +528,7 @@ def render(base, user):
                                 "Descricao":      descricao,
                                 "Cartaz":         cartaz_url
                             })
+                            get_eventos_cached.clear()
                             st.success(f"✅ Evento **{nome}** criado!")
                             st.rerun()
                         except Exception as e:
@@ -528,9 +537,9 @@ def render(base, user):
         st.divider()
 
         try:
-            eventos   = base.list_rows("Eventos")
-            presencas = base.list_rows("Presencas")
-            musicos   = base.list_rows("Musicos")
+            eventos   = get_eventos_cached()
+            presencas = get_presencas_cached()
+            musicos   = get_musicos_cached()
 
             if not eventos:
                 st.info("📭 Nenhum evento criado")
@@ -590,6 +599,7 @@ def render(base, user):
                                                 "Descricao":      descricao_edit,
                                                 "Cartaz":         cartaz_edit
                                             })
+                                            get_eventos_cached.clear()
                                             st.session_state[edit_key] = False
                                             st.success("✅ Evento atualizado!")
                                             st.rerun()
@@ -622,6 +632,7 @@ def render(base, user):
                                 if st.button("🗑️ Apagar", key=f"del_ev_{e['_id']}", type="secondary", use_container_width=True):
                                     try:
                                         base.delete_row("Eventos", e['_id'])
+                                        get_eventos_cached.clear()
                                         st.success("Evento removido!")
                                         st.rerun()
                                     except Exception as e_error:
@@ -717,8 +728,8 @@ def render(base, user):
         st.subheader("🥁 Gestão de Ensaios")
         try:
             ensaios = base.list_rows("Ensaios")
-            faltas  = base.list_rows("Faltas_Ensaios")
-            musicos = base.list_rows("Musicos")
+            faltas  = get_faltas_ensaios_cached()
+            musicos = get_musicos_cached()
         except Exception as ex:
             st.error(f"Erro ao carregar ensaios: {ex}")
             ensaios, faltas, musicos = [], [], []
@@ -756,7 +767,7 @@ def render(base, user):
     with t3:
         st.subheader("🎷 Inventário de Instrumentos")
         try:
-            musicos = base.list_rows("Musicos")
+            musicos = get_musicos_cached()
             if not musicos:
                 st.info("📭 Sem dados de músicos")
             else:
@@ -784,7 +795,7 @@ def render(base, user):
     with t4:
         st.subheader("🏫 Aulas da Escola")
         try:
-            aulas = base.list_rows("Aulas")
+            aulas = get_aulas_cached()
             if not aulas:
                 st.info("📭 Sem aulas registadas")
             else:
@@ -805,7 +816,7 @@ def render(base, user):
     with t5:
         st.subheader("📊 Status dos Músicos")
         try:
-            musicos = base.list_rows("Musicos")
+            musicos = get_musicos_cached()
             if not musicos:
                 st.info("📭 Sem dados")
             else:
@@ -843,7 +854,7 @@ def render(base, user):
     with t7:
         st.subheader("🎂 Aniversários")
         try:
-            musicos = base.list_rows("Musicos")
+            musicos = get_musicos_cached()
             if not musicos:
                 st.info("📭 Sem dados de músicos")
             else:
@@ -929,7 +940,7 @@ def render(base, user):
         st.divider()
         st.markdown("### 📋 Lista de Utilizadores")
         try:
-            utilizadores = base.list_rows("Utilizadores")
+            utilizadores = get_utilizadores_cached()
             if not utilizadores:
                 st.info("📭 Nenhum utilizador registado")
             else:
@@ -984,6 +995,7 @@ def render(base, user):
                         try:
                             user_row = utilizadores[user_selecionado]
                             base.update_row("Utilizadores", user_row['_id'], {"Password": "1234"})
+                            get_utilizadores_cached.clear()
                             st.success(f"✅ Password de **{user_row.get('Nome')}** resetada para '1234'!")
                             st.info("💡 O utilizador será obrigado a mudar a password no próximo login.")
                             st.rerun()
@@ -1043,6 +1055,7 @@ def render(base, user):
                             if novo_ingresso:
                                 dados_musico["Data Ingresso Banda"] = str(novo_ingresso)
                             base.append_row("Musicos", dados_musico)
+                            get_musicos_cached.clear()
                             st.success(f"✅ Músico **{novo_nome}** adicionado com sucesso!")
                             st.info("💡 Lembra-te de ir a **Utilizadores → Sincronizar Músicos** para criar a conta de acesso.")
                             st.rerun()
@@ -1052,7 +1065,7 @@ def render(base, user):
         st.divider()
 
         try:
-            musicos = base.list_rows("Musicos")
+            musicos = get_musicos_cached()
             if not musicos:
                 st.info("📭 Nenhum músico registado")
             else:
@@ -1141,6 +1154,7 @@ def render(base, user):
                                                 "Data de Nascimento":  str(edit_nasc)     if edit_nasc     else "",
                                                 "Data Ingresso Banda": str(edit_ingresso) if edit_ingresso else "",
                                             })
+                                            get_musicos_cached.clear()
                                             st.session_state[edit_key_m] = False
                                             st.success("✅ Músico atualizado!")
                                             st.rerun()
