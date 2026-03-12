@@ -323,7 +323,7 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
 # ============================================
 
 def render(base, user):
-    from app import (
+    from cache import (
         get_musicos_cached,
         get_eventos_cached,
         get_presencas_cached,
