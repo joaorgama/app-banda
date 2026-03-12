@@ -7,6 +7,12 @@ import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from seatable_conn import add_presenca
 from datetime import datetime, date, timedelta
+from cache import (
+    get_musicos_cached,
+    get_eventos_cached,
+    get_presencas_cached,
+    get_faltas_ensaios_cached
+)
 
 # ============================================
 # CONSTANTES ENSAIOS
@@ -323,12 +329,6 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
 # ============================================
 
 def render(base, user):
-    from cache import (
-        get_musicos_cached,
-        get_eventos_cached,
-        get_presencas_cached,
-        get_faltas_ensaios_cached
-    )
 
     # Carregar dados do músico ANTES do título para usar na saudação
     try:
