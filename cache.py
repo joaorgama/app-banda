@@ -17,19 +17,19 @@ from seatable_conn import get_base as _get_base
 def _base():
     return _get_base()
 
-@st.cache_resource(ttl=300, show_spinner=False)
+@st.cache_resource(show_spinner=False)
 def get_utilizadores_cached():
     return _base().list_rows("Utilizadores")
 
-@st.cache_resource(ttl=300, show_spinner=False)
+@st.cache_resource(ttl=600, show_spinner=False)
 def get_musicos_cached():
     return _base().list_rows("Musicos")
 
-@st.cache_resource(ttl=300, show_spinner=False)
+@st.cache_resource(ttl=600, show_spinner=False)
 def get_eventos_cached():
     return _base().list_rows("Eventos")
 
-@st.cache_resource(ttl=300, show_spinner=False)
+@st.cache_resource(ttl=600, show_spinner=False)
 def get_presencas_cached():
     return _base().list_rows("Presencas")
 
