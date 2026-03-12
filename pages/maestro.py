@@ -3,12 +3,6 @@ Interface do Maestro - Portal BMO
 """
 import streamlit as st
 import pandas as pd
-from app import (
-    get_musicos_cached,
-    get_eventos_cached,
-    get_presencas_cached,
-    get_faltas_ensaios_cached
-)
 import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta, date
@@ -504,6 +498,12 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
 # ============================================
 
 def render(base, user):
+    from app import (
+        get_musicos_cached,
+        get_eventos_cached,
+        get_presencas_cached,
+        get_faltas_ensaios_cached
+    )
     st.title("🎼 Painel do Maestro")
 
     t1, t2, t3, t4, t5, t6 = st.tabs([
