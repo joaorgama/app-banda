@@ -3,6 +3,12 @@ Interface do Músico - Portal BMO
 """
 import streamlit as st
 import time
+from app import (
+    get_musicos_cached,
+    get_eventos_cached,
+    get_presencas_cached,
+    get_faltas_ensaios_cached
+)
 import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from seatable_conn import add_presenca
@@ -274,6 +280,7 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
                     if falta_row_id:
                         try:
                             base.delete_row("Faltas_Ensaios", falta_row_id)
+                            get_faltas_ensaios_cached.clear()
                             st.success("✅ Falta cancelada!")
                             st.rerun()
                         except Exception as ex:
@@ -298,6 +305,7 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
                                         "Username": user['username'],
                                         "Motivo":   motivo_input.strip(),
                                     })
+                                    get_faltas_ensaios_cached.clear()
                                     st.success("✅ Falta registada!")
                                     st.rerun()
                                 except Exception as ex:
@@ -324,7 +332,7 @@ def render(base, user):
 
     # Carregar dados do músico ANTES do título para usar na saudação
     try:
-        musicos = base.list_rows("Musicos")
+        musicos = get_musicos_cached()
         m_row = next((r for r in musicos if str(r.get('Username', '')).lower() == user['username']), None)
     except:
         m_row = None
@@ -364,8 +372,8 @@ def render(base, user):
         st.subheader("📅 Próximos Eventos")
 
         try:
-            eventos   = base.list_rows("Eventos")
-            presencas = base.list_rows("Presencas")
+            eventos   = get_eventos_cached()
+            presencas = get_presencas_cached()
 
             if not eventos:
                 st.info("📭 Nenhum evento agendado no momento")
@@ -414,16 +422,19 @@ def render(base, user):
 
                         if c1.button("✅ Vou", key=f"vou_{e['_id']}", use_container_width=True):
                             if add_presenca(base, e['_id'], user['username'], "Vou"):
+                            get_presencas_cached.clear()
                                 st.success("✅ Presença confirmada!")
                                 st.rerun()
 
                         if c2.button("❌ Não Vou", key=f"nao_{e['_id']}", use_container_width=True):
                             if add_presenca(base, e['_id'], user['username'], "Não Vou"):
+                            get_presencas_cached.clear()
                                 st.info("Ausência registada")
                                 st.rerun()
 
                         if c3.button("❓ Talvez", key=f"talvez_{e['_id']}", use_container_width=True):
                             if add_presenca(base, e['_id'], user['username'], "Talvez"):
+                            get_presencas_cached.clear()
                                 st.warning("Resposta registada como 'Talvez'")
                                 st.rerun()
 
@@ -477,6 +488,7 @@ def render(base, user):
                             "Morada":             mor,
                             "Data de Nascimento": str(nasc)
                         })
+                        get_musicos_cached.clear()
                         st.success("✅ Dados atualizados com sucesso!")
                         time.sleep(1)
                         st.rerun()
@@ -548,6 +560,7 @@ def render(base, user):
                                 "Modelo":              modelo if not prop else "",
                                 "Num Serie":           seri   if not prop else ""
                             })
+                            get_musicos_cached.clear()
                             st.success("✅ Instrumento atualizado!")
                             time.sleep(1)
                             st.rerun()
@@ -596,7 +609,7 @@ def render(base, user):
 
         try:
             ensaios = base.list_rows("Ensaios")
-            faltas  = base.list_rows("Faltas_Ensaios")
+            faltas  = get_faltas_ensaios_cached()
         except Exception as e:
             st.error(f"Erro ao carregar ensaios: {e}")
             ensaios = []
@@ -636,7 +649,7 @@ def render(base, user):
             return str(url).strip()
 
         try:
-            eventos_gal        = base.list_rows("Eventos")
+            eventos_gal        = get_eventos_cached()
             eventos_com_cartaz = [e for e in eventos_gal if e.get('Cartaz')]
 
             if not eventos_com_cartaz:
