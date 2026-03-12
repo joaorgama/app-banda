@@ -722,7 +722,7 @@ def render(base, user):
                         'data_aniversario': aniversario_este_ano,
                         'dias_faltam':      dias_faltam,
                         'idade':            idade,
-                        'instrumento':      m.get('Instrumento', 'N/D')
+                        'instrumento':      (lambda v: v.split(' - ')[0].strip() if v else 'N/D')(str(m.get('Instrumento', '') or '').strip())
                     })
 
             aniversarios.sort(key=lambda x: x['dias_faltam'])
