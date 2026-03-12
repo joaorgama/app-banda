@@ -68,7 +68,6 @@ def aplicar_tema_css(dark):
             [data-testid="stSidebar"] * { color: #f5f5f5 !important; }
             .stMarkdown, p, span, label, div { color: #f5f5f5; }
             h1, h2, h3, h4 { color: #f5f5f5 !important; }
-
             .stButton > button {
                 background-color: #2d2d2d !important;
                 color: #f5f5f5 !important;
@@ -79,7 +78,6 @@ def aplicar_tema_css(dark):
                 border-color: #ff6b35 !important;
             }
             .stButton > button p { color: #f5f5f5 !important; }
-
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
@@ -102,7 +100,6 @@ def aplicar_tema_css(dark):
             [data-testid="stSidebar"] * { color: #000000 !important; }
             .stMarkdown, p, span, label, div { color: #000000; }
             h1, h2, h3, h4 { color: #000000 !important; }
-
             .stButton > button {
                 background-color: #f0f2f6 !important;
                 color: #000000 !important;
@@ -113,7 +110,6 @@ def aplicar_tema_css(dark):
                 border-color: #ff6b35 !important;
             }
             .stButton > button p { color: #000000 !important; }
-
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea,
             .stSelectbox > div > div {
@@ -127,6 +123,13 @@ def aplicar_tema_css(dark):
             .stTabs [data-baseweb="tab"] { color: #000000 !important; }
             </style>
         """, unsafe_allow_html=True)
+
+# ============================================
+# HELPER: DETECTAR ERRO 429
+# ============================================
+
+def is_429(e):
+    return '429' in str(e) or 'too many requests' in str(e).lower()
 
 # ============================================
 # INICIALIZAR SESSION STATE
@@ -151,37 +154,38 @@ if not base:
     st.stop()
 
 # ============================================
-# CACHES DE LEITURA (evitar 429)
+# CACHES DE LEITURA
+# TTL = 300s (5 min) — reduz chamadas à API drasticamente
 # ============================================
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_utilizadores_cached(_ignored):
     return base.list_rows("Utilizadores")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_musicos_cached(_ignored):
     return base.list_rows("Musicos")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_eventos_cached(_ignored):
     return base.list_rows("Eventos")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_presencas_cached(_ignored):
     return base.list_rows("Presencas")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_aulas_cached(_ignored):
     return base.list_rows("Aulas")
 
-@st.cache_data(ttl=60, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def get_faltas_ensaios_cached(_ignored):
     return base.list_rows("Faltas_Ensaios")
 
-# Nota: Ensaios NÃO é cacheado aqui porque o calendário precisa de dados sempre frescos.
+# Ensaios NÃO cacheados — calendário precisa dados frescos
 
 # ============================================
-# APLICAR TEMA (SEMPRE, EM CADA RERUN)
+# APLICAR TEMA
 # ============================================
 
 aplicar_tema_css(st.session_state.get('dark_mode', True))
@@ -291,7 +295,6 @@ if not st.session_state['auth_status']:
                     st.error("⚠️ Preencha todos os campos")
                 else:
                     try:
-                        # usa cache para evitar 429
                         users_list = get_utilizadores_cached(base)
                         df_users = pd.DataFrame(users_list) if users_list else pd.DataFrame()
 
@@ -340,9 +343,14 @@ if not st.session_state['auth_status']:
                                     st.rerun()
                                 else:
                                     st.error("❌ Password incorreta")
+
                     except Exception as e:
-                        st.error(f"❌ Erro ao fazer login: {str(e)}")
-                        st.info("💡 Verifique se a tabela 'Utilizadores' existe no SeaTable")
+                        if is_429(e):
+                            st.warning("⏳ O servidor está temporariamente sobrecarregado (demasiados pedidos).")
+                            st.info("Por favor aguarde **1 a 2 minutos** e tente novamente. Se o problema persistir, contacte o administrador.")
+                        else:
+                            st.error(f"❌ Erro ao fazer login: {str(e)}")
+                            st.info("💡 Verifique se a tabela 'Utilizadores' existe no SeaTable")
 
 # ============================================
 # ÁREA AUTENTICADA
@@ -351,9 +359,6 @@ if not st.session_state['auth_status']:
 else:
     user = st.session_state['user_info']
     try:
-        # As páginas internas continuam a usar base diretamente.
-        # Dentro de cada módulo (musico, maestro, direcao, professor),
-        # podes substituir list_rows por estas funções cacheadas onde fizer sentido.
         if user['role'] == "Musico":
             musico.render(base, user)
         elif user['role'] == "Professor":
@@ -368,8 +373,12 @@ else:
             if st.button("🔄 Tentar novamente"):
                 st.rerun()
     except Exception as e:
-        st.error(f"❌ Erro ao carregar a página: {str(e)}")
-        st.exception(e)
+        if is_429(e):
+            st.warning("⏳ O servidor está temporariamente sobrecarregado.")
+            st.info("Aguarde **1 a 2 minutos** e clique em Recarregar.")
+        else:
+            st.error(f"❌ Erro ao carregar a página: {str(e)}")
+            st.exception(e)
         if st.button("🔄 Recarregar"):
             st.rerun()
 
