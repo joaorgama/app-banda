@@ -498,7 +498,7 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
 # ============================================
 
 def render(base, user):
-    from app import (
+    from cache import (
         get_musicos_cached,
         get_eventos_cached,
         get_presencas_cached,
