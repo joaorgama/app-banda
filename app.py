@@ -154,35 +154,37 @@ if not base:
     st.stop()
 
 # ============================================
-# CACHES DE LEITURA
-# TTL = 300s (5 min) — reduz chamadas à API drasticamente
+# CACHES DE LEITURA — st.cache_resource
+# Partilhado entre TODOS os utilizadores/sessões.
+# 1 call à API a cada 5 min, independentemente
+# de quantos utilizadores estejam online.
 # ============================================
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_utilizadores_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_utilizadores_cached():
     return base.list_rows("Utilizadores")
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_musicos_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_musicos_cached():
     return base.list_rows("Musicos")
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_eventos_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_eventos_cached():
     return base.list_rows("Eventos")
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_presencas_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_presencas_cached():
     return base.list_rows("Presencas")
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_aulas_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_aulas_cached():
     return base.list_rows("Aulas")
 
-@st.cache_data(ttl=300, show_spinner=False)
-def get_faltas_ensaios_cached(_ignored):
+@st.cache_resource(ttl=300, show_spinner=False)
+def get_faltas_ensaios_cached():
     return base.list_rows("Faltas_Ensaios")
 
-# Ensaios NÃO cacheados — calendário precisa dados frescos
+# Ensaios NÃO cacheados — calendário precisa dados sempre frescos
 
 # ============================================
 # APLICAR TEMA
@@ -207,6 +209,8 @@ with col_tema:
                 base.update_row("Utilizadores", st.session_state['user_info']['row_id'], {
                     "Tema": 'dark' if novo_dark else 'light'
                 })
+                # Invalida cache para reflectir a alteração
+                get_utilizadores_cached.clear()
             except Exception:
                 pass
         st.rerun()
@@ -268,6 +272,8 @@ if st.session_state['auth_status'] and st.session_state['must_change_pass']:
                 try:
                     nova_hash = bcrypt.hashpw(new_pass.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                     base.update_row("Utilizadores", user['row_id'], {"Password": nova_hash})
+                    # Invalida cache para a nova password ser reconhecida no próximo login
+                    get_utilizadores_cached.clear()
                     st.session_state['must_change_pass'] = False
                     st.success("✅ Password alterada com sucesso!")
                     st.rerun()
@@ -295,7 +301,8 @@ if not st.session_state['auth_status']:
                     st.error("⚠️ Preencha todos os campos")
                 else:
                     try:
-                        users_list = get_utilizadores_cached(base)
+                        # cache_resource — 1 call para todos os utilizadores
+                        users_list = get_utilizadores_cached()
                         df_users = pd.DataFrame(users_list) if users_list else pd.DataFrame()
 
                         if df_users.empty:
