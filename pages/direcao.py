@@ -482,20 +482,37 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
 # RENDER PRINCIPAL
 # ============================================
 
+# ============================================
+# HELPERS GALERIA
+# ============================================
+
+def _extrair_file_id(url):
+    url = str(url).strip()
+    if 'drive.google.com/file/d/' in url:
+        try:
+            return url.split('/file/d/')[1].split('/')[0]
+        except Exception:
+            return None
+    if 'drive.google.com/open?id=' in url:
+        try:
+            return url.split('open?id=')[1].split('&')[0]
+        except Exception:
+            return None
+    return None
+
+def _url_imagem_direta(url):
+    if not url:
+        return None
+    file_id = _extrair_file_id(url)
+    if file_id:
+        return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+    return str(url).strip()
+
+
 def render(base, user):
     st.title("📊 Painel da Direção")
 
-    t1, t2, t3, t4, t5, t6, t7, t8, t9 = st.tabs([
-        "📅 Eventos",
-        "🥁 Ensaios",
-        "🎷 Inventário",
-        "🏫 Escola",
-        "📊 Status Geral",
-        "💬 Mensagens",
-        "🎂 Aniversários",
-        "👥 Utilizadores",
-        "👤 Músicos"
-    ])
+   
 
     # ========================================
     # TAB 1: GESTÃO DE EVENTOS
@@ -1185,3 +1202,127 @@ def render(base, user):
 
         except Exception as e:
             st.error(f"❌ Erro ao carregar músicos: {str(e)}")
+
+    # ========================================
+    # TAB 10: GALERIA
+    # ========================================
+    with t10:
+        st.subheader("🖼️ Galeria de Eventos")
+        try:
+            eventos_gal = get_eventos_cached()
+            if not eventos_gal:
+                st.info("Nenhum evento registado.")
+            else:
+                com_cartaz = [e for e in eventos_gal if str(e.get('Cartaz', '') or '').strip()]
+                sem_cartaz = [e for e in eventos_gal if not str(e.get('Cartaz', '') or '').strip()]
+
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total de Eventos", len(eventos_gal))
+                col2.metric("Com Cartaz", len(com_cartaz))
+                col3.metric("Sem Cartaz", len(sem_cartaz))
+
+                st.divider()
+
+                if com_cartaz:
+                    st.markdown("### 📸 Cartazes Disponíveis")
+                    cols_gal = st.columns(3)
+                    for i, ev in enumerate(com_cartaz):
+                        eid      = ev['_id']
+                        nome_ev  = ev.get('Nome do Evento', 'Evento')
+                        data_ev  = formatar_data_pt(ev.get('Data', ''))
+                        img_url  = _url_imagem_direta(ev.get('Cartaz', ''))
+                        edit_key    = f"gal_edit_{eid}"
+                        confirm_key = f"gal_confirm_rem_{eid}"
+
+                        with cols_gal[i % 3]:
+                            if img_url:
+                                st.markdown(
+                                    f'<img src="{img_url}" alt="{nome_ev}" '
+                                    f'style="width:100%;border-radius:8px;margin-bottom:4px">',
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.warning("⚠️ Cartaz indisponível")
+
+                            st.caption(f"**{nome_ev}**  \n{data_ev}")
+
+                            col_e, col_r = st.columns(2)
+                            with col_e:
+                                if st.button("✏️ Editar", key=f"gal_btn_edit_{eid}", use_container_width=True):
+                                    st.session_state[edit_key] = not st.session_state.get(edit_key, False)
+                                    st.rerun()
+                            with col_r:
+                                if st.button("🗑️ Remover", key=f"gal_btn_rem_{eid}", use_container_width=True):
+                                    st.session_state[confirm_key] = True
+                                    st.rerun()
+
+                            if st.session_state.get(confirm_key, False):
+                                st.warning("Remover este cartaz?")
+                                cc1, cc2 = st.columns(2)
+                                with cc1:
+                                    if st.button("Sim", key=f"gal_sim_rem_{eid}", use_container_width=True, type="primary"):
+                                        try:
+                                            base.update_row("Eventos", eid, {"Cartaz": ""})
+                                            get_eventos_cached.clear()
+                                            st.session_state.pop(confirm_key, None)
+                                            st.success("Cartaz removido!")
+                                            st.rerun()
+                                        except Exception as ex:
+                                            st.error(f"Erro: {ex}")
+                                with cc2:
+                                    if st.button("Não", key=f"gal_nao_rem_{eid}", use_container_width=True):
+                                        st.session_state.pop(confirm_key, None)
+                                        st.rerun()
+
+                            if st.session_state.get(edit_key, False):
+                                with st.form(f"form_gal_edit_{eid}"):
+                                    nova_url = st.text_input(
+                                        "Nova URL do Cartaz",
+                                        value=str(ev.get('Cartaz', '') or ''),
+                                        placeholder="https://drive.google.com/file/d/..."
+                                    )
+                                    col_s, col_c = st.columns(2)
+                                    with col_s:
+                                        guardar = st.form_submit_button("💾 Guardar", use_container_width=True, type="primary")
+                                    with col_c:
+                                        cancelar = st.form_submit_button("Cancelar", use_container_width=True)
+                                    if guardar:
+                                        try:
+                                            base.update_row("Eventos", eid, {"Cartaz": nova_url.strip()})
+                                            get_eventos_cached.clear()
+                                            st.session_state[edit_key] = False
+                                            st.success("✅ Cartaz atualizado!")
+                                            st.rerun()
+                                        except Exception as ex:
+                                            st.error(f"Erro: {ex}")
+                                    if cancelar:
+                                        st.session_state[edit_key] = False
+                                        st.rerun()
+
+                if sem_cartaz:
+                    st.divider()
+                    st.markdown("### 📋 Eventos sem Cartaz")
+                    for ev in sem_cartaz:
+                        eid     = ev['_id']
+                        nome_ev = ev.get('Nome do Evento', 'Evento')
+                        data_ev = formatar_data_pt(ev.get('Data', ''))
+                        with st.expander(f"📅 {data_ev} — {nome_ev}"):
+                            with st.form(f"form_gal_add_{eid}"):
+                                nova_url = st.text_input(
+                                    "URL do Cartaz",
+                                    placeholder="https://drive.google.com/file/d/..."
+                                )
+                                if st.form_submit_button("➕ Adicionar Cartaz", use_container_width=True, type="primary"):
+                                    if not nova_url.strip():
+                                        st.error("Introduza uma URL válida")
+                                    else:
+                                        try:
+                                            base.update_row("Eventos", eid, {"Cartaz": nova_url.strip()})
+                                            get_eventos_cached.clear()
+                                            st.success(f"✅ Cartaz adicionado a '{nome_ev}'!")
+                                            st.rerun()
+                                        except Exception as ex:
+                                            st.error(f"Erro: {ex}")
+
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar galeria: {e}")
