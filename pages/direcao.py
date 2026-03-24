@@ -512,6 +512,19 @@ def _url_imagem_direta(url):
 def render(base, user):
     st.title("📊 Painel da Direção")
 
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 = st.tabs([
+        "📅 Eventos",
+        "🥁 Ensaios",
+        "🎷 Inventário",
+        "🏫 Escola",
+        "📊 Status Geral",
+        "💬 Mensagens",
+        "🎂 Aniversários",
+        "👥 Utilizadores",
+        "👤 Músicos",
+        "🖼️ Galeria"
+    ])
+
    
 
     # ========================================
