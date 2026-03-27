@@ -888,7 +888,7 @@ def render(base, user):
                     novo_telefone = st.text_input("Telefone", placeholder="Ex: 912345678")
                     novo_email    = st.text_input("Email", placeholder="Ex: joao@email.com")
                     novo_morada   = st.text_input("Morada", placeholder="Ex: Rua X, Lisboa")
-                    novo_encarr   = st.text_input("Encarregado de Educação", placeholder="Ex: Maria Silva")
+                    novo_encarr   = st.text_input("Encarregado de Educacao", placeholder="Ex: Maria Silva")
                 with col2:
                     novo_instrumento = st.text_input("Instrumento Pretendido", placeholder="Ex: Clarinete")
                     novo_polo        = st.selectbox("Pólo da Escola", ["", "Algés", "Oeiras", "Outro"])
@@ -925,7 +925,7 @@ def render(base, user):
                                 "Telefone":                novo_telefone.strip() if novo_telefone else "",
                                 "Email":                   novo_email.strip() if novo_email else "",
                                 "Morada":                  novo_morada.strip() if novo_morada else "",
-                                "Encarregado de Educação": novo_encarr.strip() if novo_encarr else "",
+                                "Encarregado de Educacao": novo_encarr.strip() if novo_encarr else "",
                                 "Instrumento Pretendido":  novo_instrumento.strip() if novo_instrumento else "",
                                 "Pólo da escola":          novo_polo if novo_polo else "",
                                 "Professor":               novo_professor if novo_professor else "",
@@ -974,7 +974,7 @@ def render(base, user):
                         if termo in str(a.get("Nome", "")).lower()
                         or termo in str(a.get("Instrumento Pretendido", "")).lower()
                         or termo in str(a.get("Professor", "")).lower()
-                        or termo in str(a.get("Encarregado de Educação", "")).lower()
+                        or termo in str(a.get("Encarregado de Educacao", "")).lower()
                     ]
                 if filtro_polo != "Todos":
                     if filtro_polo == "Sem pólo":
@@ -1014,8 +1014,8 @@ def render(base, user):
                                     e_telefone = st.text_input("Telefone", value=str(a.get("Telefone", "") or ""))
                                     e_email    = st.text_input("Email", value=str(a.get("Email", "") or ""))
                                     e_morada   = st.text_input("Morada", value=str(a.get("Morada", "") or ""))
-                                    e_encarr   = st.text_input("Encarregado de Educação",
-                                                               value=str(a.get("Encarregado de Educação", "") or ""))
+                                    e_encarr   = st.text_input("Encarregado de Educacao",
+                                                               value=str(a.get("Encarregado de Educacao", "") or ""))
                                 with ec2:
                                     e_instr  = st.text_input("Instrumento Pretendido",
                                                              value=str(a.get("Instrumento Pretendido", "") or ""))
@@ -1067,7 +1067,7 @@ def render(base, user):
                                                 "Telefone":                e_telefone.strip(),
                                                 "Email":                   e_email.strip(),
                                                 "Morada":                  e_morada.strip(),
-                                                "Encarregado de Educação": e_encarr.strip(),
+                                                "Encarregado de Educacao": e_encarr.strip(),
                                                 "Instrumento Pretendido":  e_instr.strip(),
                                                 "Pólo da escola":          e_polo,
                                                 "Professor":               e_prof if e_prof else "",
@@ -1089,7 +1089,7 @@ def render(base, user):
                                 st.write(f"📞 **Telefone:** {a.get('Telefone') or '---'}")
                                 st.write(f"📧 **Email:** {a.get('Email') or '---'}")
                                 st.write(f"🏠 **Morada:** {a.get('Morada') or '---'}")
-                                st.write(f"👨‍👩‍👦 **Enc. Educação:** {a.get('Encarregado de Educação') or '---'}")
+                                st.write(f"👨‍👩‍👦 **Enc. Educação:** {a.get('Encarregado de Educacao') or '---'}")
                             with col2:
                                 nasc = converter_data_robusta(a.get("Data de Nascimento"))
                                 ing  = converter_data_robusta(a.get("Data de Ingresso na ..."))
