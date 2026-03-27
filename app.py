@@ -57,8 +57,25 @@ div.viewerBadge { display: none !important; }
 .styles_viewerBadge1yB5 { display: none !important; }
 [data-testid="collapsedControl"] { display: flex !important; }
 .login-header { text-align: center; padding: 2rem 0; color: #ff6b35; }
+
+/* Botões primary — laranja sempre */
+[data-testid="baseButton-primary"],
+[data-testid="baseButton-primaryFormSubmit"] {
+    background-color: #ff6b35 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+[data-testid="baseButton-primary"] p,
+[data-testid="baseButton-primaryFormSubmit"] p {
+    color: #ffffff !important;
+}
+[data-testid="baseButton-primary"]:hover,
+[data-testid="baseButton-primaryFormSubmit"]:hover {
+    background-color: #e05a28 !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ============================================
 # HELPER: APLICAR TEMA VIA CSS
