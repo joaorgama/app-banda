@@ -6,7 +6,7 @@ import pandas as pd
 import calendar
 from helpers import formatar_data_pt, converter_data_robusta
 from datetime import datetime, timedelta, date
-from app import (
+from cache import (
     get_musicos_cached,
     get_eventos_cached,
     get_presencas_cached,
