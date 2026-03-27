@@ -1348,81 +1348,81 @@ def render(base, user):
     # ========================================
 
     with t11:
-    st.subheader("🔔 Enviar Notificação Push")
-
-    from utils.notificacoes import (
-        enviar_para_todos, enviar_para_utilizador,
-        enviar_para_naipe, enviar_para_instrumento,
-        listar_naipes, listar_instrumentos
-    )
-
-    utilizadores = get_utilizadores_cached()
-
-    tipo_envio = st.radio(
-        "Destinatários:",
-        ["📢 Todos", "👤 Músico específico", "🎺 Por Naipe", "🎷 Por Instrumento"],
-        horizontal=True,
-        key="ntfy_tipo"
-    )
-
-    titulo_notif   = st.text_input("Título", placeholder="Ex: Ensaio cancelado", key="ntfy_titulo")
-    mensagem_notif = st.text_area("Mensagem", placeholder="Ex: O ensaio de terça foi cancelado.", key="ntfy_msg")
-    prioridade = st.select_slider(
-        "Prioridade",
-        options=["min", "low", "default", "high", "urgent"],
-        value="default",
-        key="ntfy_prio"
-    )
-
-    destinatario_username = None
-    naipe_sel             = None
-    instrumento_sel       = None
-
-    if tipo_envio == "👤 Músico específico":
-        utilizadores_ntfy = [u for u in utilizadores if u.get("Ntfy_Topic")]
-        if not utilizadores_ntfy:
-            st.warning("Nenhum músico tem notificações ativadas.")
-        else:
-            opcoes = {u.get("Nome", u.get("Username", "")): u.get("Username") for u in utilizadores_ntfy}
-            nome_sel = st.selectbox("Selecionar músico:", list(opcoes.keys()), key="ntfy_dest_user")
-            destinatario_username = opcoes[nome_sel]
-
-    elif tipo_envio == "🎺 Por Naipe":
-        naipes = listar_naipes(base)
-        if not naipes:
-            st.warning("Sem naipes definidos.")
-        else:
-            naipe_sel = st.selectbox("Selecionar naipe:", naipes, key="ntfy_dest_naipe")
-
-    elif tipo_envio == "🎷 Por Instrumento":
-        instrumentos = listar_instrumentos(base)
-        if not instrumentos:
-            st.warning("Sem instrumentos definidos.")
-        else:
-            instrumento_sel = st.selectbox("Selecionar instrumento:", instrumentos, key="ntfy_dest_instr")
-
-    # Botão de teste
-    if st.button("🧪 Teste ntfy (canal geral)", key="btn_teste_ntfy"):
-        from utils.notificacoes import enviar_notificacao, TOPICO_GERAL
-        ok = enviar_notificacao(TOPICO_GERAL, "🧪 Teste BMO", "Se recebes isto, o ntfy está a funcionar!")
-        st.success("✅ Enviado!") if ok else st.error("❌ Falhou")
-
-    st.divider()
-
-    if st.button("📤 Enviar Notificação", type="primary", key="btn_enviar_ntfy"):
-        if not titulo_notif or not mensagem_notif:
-            st.error("❌ Preenche o título e a mensagem.")
-        else:
-            with st.spinner("A enviar..."):
-                if tipo_envio == "📢 Todos":
-                    n = enviar_para_todos(base, titulo_notif, mensagem_notif, prioridade)
-                    st.success(f"✅ Enviado para {n} músico(s).")
-                elif tipo_envio == "👤 Músico específico" and destinatario_username:
-                    ok = enviar_para_utilizador(base, destinatario_username, titulo_notif, mensagem_notif, prioridade)
-                    st.success("✅ Enviado!") if ok else st.error("❌ Falhou.")
-                elif tipo_envio == "🎺 Por Naipe" and naipe_sel:
-                    n = enviar_para_naipe(base, naipe_sel, titulo_notif, mensagem_notif, prioridade)
-                    st.success(f"✅ Enviado para {n} músico(s) do naipe {naipe_sel}.")
-                elif tipo_envio == "🎷 Por Instrumento" and instrumento_sel:
-                    n = enviar_para_instrumento(base, instrumento_sel, titulo_notif, mensagem_notif, prioridade)
-                    st.success(f"✅ Enviado para {n} músico(s) com {instrumento_sel}.")
+        st.subheader("🔔 Enviar Notificação Push")
+    
+        from utils.notificacoes import (
+            enviar_para_todos, enviar_para_utilizador,
+            enviar_para_naipe, enviar_para_instrumento,
+            listar_naipes, listar_instrumentos
+        )
+    
+        utilizadores = get_utilizadores_cached()
+    
+        tipo_envio = st.radio(
+            "Destinatários:",
+            ["📢 Todos", "👤 Músico específico", "🎺 Por Naipe", "🎷 Por Instrumento"],
+            horizontal=True,
+            key="ntfy_tipo"
+        )
+    
+        titulo_notif   = st.text_input("Título", placeholder="Ex: Ensaio cancelado", key="ntfy_titulo")
+        mensagem_notif = st.text_area("Mensagem", placeholder="Ex: O ensaio de terça foi cancelado.", key="ntfy_msg")
+        prioridade = st.select_slider(
+            "Prioridade",
+            options=["min", "low", "default", "high", "urgent"],
+            value="default",
+            key="ntfy_prio"
+        )
+    
+        destinatario_username = None
+        naipe_sel             = None
+        instrumento_sel       = None
+    
+        if tipo_envio == "👤 Músico específico":
+            utilizadores_ntfy = [u for u in utilizadores if u.get("Ntfy_Topic")]
+            if not utilizadores_ntfy:
+                st.warning("Nenhum músico tem notificações ativadas.")
+            else:
+                opcoes = {u.get("Nome", u.get("Username", "")): u.get("Username") for u in utilizadores_ntfy}
+                nome_sel = st.selectbox("Selecionar músico:", list(opcoes.keys()), key="ntfy_dest_user")
+                destinatario_username = opcoes[nome_sel]
+    
+        elif tipo_envio == "🎺 Por Naipe":
+            naipes = listar_naipes(base)
+            if not naipes:
+                st.warning("Sem naipes definidos.")
+            else:
+                naipe_sel = st.selectbox("Selecionar naipe:", naipes, key="ntfy_dest_naipe")
+    
+        elif tipo_envio == "🎷 Por Instrumento":
+            instrumentos = listar_instrumentos(base)
+            if not instrumentos:
+                st.warning("Sem instrumentos definidos.")
+            else:
+                instrumento_sel = st.selectbox("Selecionar instrumento:", instrumentos, key="ntfy_dest_instr")
+    
+        # Botão de teste
+        if st.button("🧪 Teste ntfy (canal geral)", key="btn_teste_ntfy"):
+            from utils.notificacoes import enviar_notificacao, TOPICO_GERAL
+            ok = enviar_notificacao(TOPICO_GERAL, "🧪 Teste BMO", "Se recebes isto, o ntfy está a funcionar!")
+            st.success("✅ Enviado!") if ok else st.error("❌ Falhou")
+    
+        st.divider()
+    
+        if st.button("📤 Enviar Notificação", type="primary", key="btn_enviar_ntfy"):
+            if not titulo_notif or not mensagem_notif:
+                st.error("❌ Preenche o título e a mensagem.")
+            else:
+                with st.spinner("A enviar..."):
+                    if tipo_envio == "📢 Todos":
+                        n = enviar_para_todos(base, titulo_notif, mensagem_notif, prioridade)
+                        st.success(f"✅ Enviado para {n} músico(s).")
+                    elif tipo_envio == "👤 Músico específico" and destinatario_username:
+                        ok = enviar_para_utilizador(base, destinatario_username, titulo_notif, mensagem_notif, prioridade)
+                        st.success("✅ Enviado!") if ok else st.error("❌ Falhou.")
+                    elif tipo_envio == "🎺 Por Naipe" and naipe_sel:
+                        n = enviar_para_naipe(base, naipe_sel, titulo_notif, mensagem_notif, prioridade)
+                        st.success(f"✅ Enviado para {n} músico(s) do naipe {naipe_sel}.")
+                    elif tipo_envio == "🎷 Por Instrumento" and instrumento_sel:
+                        n = enviar_para_instrumento(base, instrumento_sel, titulo_notif, mensagem_notif, prioridade)
+                        st.success(f"✅ Enviado para {n} músico(s) com {instrumento_sel}.")
