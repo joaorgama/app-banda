@@ -330,6 +330,70 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
 
 def render(base, user):
 
+    dark = st.session_state.get('dark_mode', True)
+
+    if not dark:
+        st.markdown("""
+        <style>
+        /* === SELECTBOX DROPDOWN === */
+        div[data-baseweb="popover"],
+        div[data-baseweb="popover"] > div,
+        div[data-baseweb="popover"] > div > div {
+            background-color: #ffffff !important;
+            border: 1px solid #ccc !important;
+        }
+        ul[data-baseweb="menu"],
+        div[data-baseweb="menu"] {
+            background-color: #ffffff !important;
+        }
+        li[role="option"],
+        div[role="option"],
+        [data-baseweb="menu-item"] {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        li[role="option"]:hover,
+        div[role="option"]:hover,
+        [data-baseweb="menu-item"]:hover {
+            background-color: #f0f2f6 !important;
+            color: #000000 !important;
+        }
+        /* Item selecionado */
+        [aria-selected="true"] {
+            background-color: #ffe8df !important;
+            color: #ff6b35 !important;
+        }
+
+        /* === DATE INPUT === */
+        .stDateInput > div > div > input {
+            color-scheme: light !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+
+        /* === BOTÃO PRIMARY === */
+        button[data-testid="baseButton-primary"],
+        button[kind="primary"] {
+            background-color: #ff6b35 !important;
+            color: #ffffff !important;
+            border: none !important;
+        }
+        button[data-testid="baseButton-primary"] p,
+        button[kind="primary"] p {
+            color: #ffffff !important;
+        }
+
+        /* === BOTÃO SECONDARY/NORMAL === */
+        button[data-testid="baseButton-secondary"],
+        button[kind="secondary"] {
+            background-color: #f0f2f6 !important;
+            color: #000000 !important;
+            border: 1px solid #ccc !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+
     # Carregar dados do músico ANTES do título para usar na saudação
     try:
         musicos = get_musicos_cached()
