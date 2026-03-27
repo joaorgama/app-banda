@@ -75,7 +75,7 @@ def aplicar_tema_css(dark):
             background-color: #1f1f1f !important;
             color: #f5f5f5 !important;
         }
-        .stMarkdown, p, span, label, div { color: #f5f5f5; }
+        .stMarkdown p, .stMarkdown span, .stMarkdown label, [data-testid="stText"], [data-testid="stMarkdownContainer"] p { color: #f5f5f5; }
         h1, h2, h3, h4 { color: #f5f5f5 !important; }
 
         /* Botões */
@@ -167,7 +167,7 @@ def aplicar_tema_css(dark):
             background-color: #f0f2f6 !important;
             color: #000000 !important;
         }
-        .stMarkdown, p, span, label, div { color: #000000; }
+        .stMarkdown p, .stMarkdown span, .stMarkdown label, [data-testid="stText"], [data-testid="stMarkdownContainer"] p { color: #000000; }
         h1, h2, h3, h4 { color: #000000 !important; }
 
         /* Botões */
