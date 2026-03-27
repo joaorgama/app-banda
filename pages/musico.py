@@ -447,41 +447,30 @@ def render(base, user):
     # ========================================
     # TAB 2: DADOS PESSOAIS
     # ========================================
-    with t2:
-        st.subheader("📋 Ficha Pessoal")
 
+    with t2:
+        st.subheader("Ficha Pessoal")
         if not m_row:
-            st.warning("⚠️ Ficha de músico não encontrada na base de dados")
+            st.warning("Ficha de músico não encontrada na base de dados.")
         else:
             with st.form("ficha_pessoal"):
                 col1, col2 = st.columns(2)
-
                 with col1:
-                    tel = st.text_input(
-                        "📞 Telemóvel",
-                        value=str(m_row.get('Telefone', '')).replace('.0', ''),
-                        help="Formato: 912345678"
-                    )
-                    nasc = st.date_input(
-                        "🎂 Data de Nascimento",
-                        value=converter_data_robusta(m_row.get('Data de Nascimento')) or datetime(1990, 1, 1),
-                        min_value=datetime(1940, 1, 1),
-                        max_value=datetime.now()
-                    )
-
+                    tel  = st.text_input("📱 Telemóvel",
+                                         value=str(m_row.get('Telefone', '')).replace('.0',''),
+                                         help="Formato: 912345678")
+                    nasc = st.date_input("🎂 Data de Nascimento",
+                                         value=converter_data_robusta(m_row.get('Data de Nascimento')) or datetime(1990,1,1),
+                                         min_value=datetime(1940,1,1),
+                                         max_value=datetime.now())
                 with col2:
-                    mail = st.text_input(
-                        "📧 Email",
-                        value=str(m_row.get('Email', '')),
-                        help="Email válido para contactos"
-                    )
-
-                mor = st.text_area(
-                    "🏠 Morada Completa",
-                    value=str(m_row.get('Morada', '')),
-                    height=100,
-                    help="Rua, Código Postal, Localidade"
-                )
+                    mail = st.text_input("📧 Email",
+                                         value=str(m_row.get('Email', '')),
+                                         help="Email válido para contactos")
+                    mor  = st.text_area("🏠 Morada Completa",
+                                         value=str(m_row.get('Morada', '')),
+                                         height=100,
+                                         help="Rua, Código Postal, Localidade")
 
                 if st.form_submit_button("💾 Guardar Alterações", use_container_width=True):
                     try:
@@ -498,44 +487,42 @@ def render(base, user):
                     except Exception as e:
                         st.error(f"❌ Erro ao atualizar: {e}")
 
-        # ✅ FORA do with st.form — repara que recuou um nível de indentação
-        st.divider()
-        st.subheader("🔔 Notificações")
+            # ← FORA do with st.form (mesma indentação que o "with st.form")
+            st.divider()
+            st.subheader("🔔 Notificações")
 
-        topico_atual = m_row.get("Ntfy_Topic", "") if m_row else ""
+            topico_atual = m_row.get("Ntfy_Topic", "") if m_row else ""
 
-        if topico_atual:
-            st.success("✅ Notificações ativadas.")
-            st.markdown(f"""
-            **Para receber noutro dispositivo:**
-            1. Instala a app **ntfy** no telemóvel
-            2. Toca em ➕ e subscreve: `{topico_atual}`
-            """)
-            if st.button("❌ Desativar notificações", key="btn_desativar_ntfy"):
-                try:
-                    base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": ""})
-                    get_utilizadores_cached.clear()
-                    st.success("Notificações desativadas.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-        else:
-            st.info("Ativa para receberes avisos importantes da banda no telemóvel.")
-            if st.button("🔔 Ativar Notificações", key="btn_ativar_ntfy"):
-                novo_topico = gerar_topico_unico()
-                try:
-                    base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": novo_topico})
-                    get_utilizadores_cached.clear()
-                    st.success("✅ Notificações ativadas!")
-                    st.markdown(f"""
-                    **Como configurar:**
-                    1. Instala a app **ntfy** no telemóvel
-                    2. Toca em ➕ e subscreve: `{novo_topico}`
-                    3. Pronto — recebes notificações mesmo com a app fechada!
-                    """)
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
+            if topico_atual:
+                st.success("✅ Notificações ativadas.")
+                st.markdown(f"""
+                **Para receber noutro dispositivo:**
+                1. Instala a app **ntfy** no telemóvel
+                2. Toca em ➕ e subscreve: `{topico_atual}`
+                """)
+                if st.button("❌ Desativar notificações", key="btn_desativar_ntfy"):
+                    try:
+                        base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": ""})
+                        st.success("Notificações desativadas.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+            else:
+                st.info("Ativa para receberes avisos importantes da banda no telemóvel.")
+                if st.button("🔔 Ativar Notificações", key="btn_ativar_ntfy"):
+                    novo_topico = gerar_topico_unico()
+                    try:
+                        base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": novo_topico})
+                        st.success("✅ Notificações ativadas!")
+                        st.markdown(f"""
+                        **Como configurar:**
+                        1. Instala a app **ntfy** no telemóvel
+                        2. Toca em ➕ e subscreve: `{novo_topico}`
+                        3. Pronto — recebes notificações mesmo com a app fechada!
+                        """)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
 
     # ========================================
     # TAB 3: INSTRUMENTO
