@@ -488,42 +488,57 @@ def render(base, user):
                         st.error(f"❌ Erro ao atualizar: {e}")
 
             # ← FORA do with st.form (mesma indentação que o "with st.form")
-            st.divider()
-            st.subheader("🔔 Notificações")
+        st.divider()
+        st.subheader("🔔 Notificações")
 
-            topico_atual = m_row.get("Ntfy_Topic", "") if m_row else ""
+        # ── Canal Geral ──────────────────────────────────────────────
+        st.info("""
+📲 **Instala a app ntfy no teu telemóvel** e subscreve o canal geral da banda:
 
-            if topico_atual:
-                st.success("✅ Notificações ativadas.")
-                st.markdown(f"""
-                **Para receber noutro dispositivo:**
-                1. Instala a app **ntfy** no telemóvel
-                2. Toca em ➕ e subscreve: `{topico_atual}`
-                """)
-                if st.button("❌ Desativar notificações", key="btn_desativar_ntfy"):
-                    try:
-                        base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": ""})
-                        st.success("Notificações desativadas.")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-            else:
-                st.info("Ativa para receberes avisos importantes da banda no telemóvel.")
-                if st.button("🔔 Ativar Notificações", key="btn_ativar_ntfy"):
-                    novo_topico = gerar_topico_unico()
-                    try:
-                        base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": novo_topico})
-                        st.success("✅ Notificações ativadas!")
-                        st.markdown(f"""
-                        **Como configurar:**
-                        1. Instala a app **ntfy** no telemóvel
-                        2. Toca em ➕ e subscreve: `{novo_topico}`
-                        3. Pronto — recebes notificações mesmo com a app fechada!
-                        """)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
+**`amo-bmo-geral`**
 
+Assim recebes todos os avisos e comunicações importantes da direção.
+Disponível para [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy) e [iPhone](https://apps.apple.com/app/ntfy/id1625396347).
+        """)
+
+        st.divider()
+
+        # ── Canal Pessoal ────────────────────────────────────────────
+        st.markdown("##### 🔕 Notificações Pessoais")
+        st.caption("Para além do canal geral, podes ativar um canal privado para receberes mensagens dirigidas a ti.")
+
+        topico_atual = (
+            st.session_state.get('ntfy_topic_ativo') or
+            user.get("Ntfy_Topic", "") or
+            (m_row.get("Ntfy_Topic", "") if m_row else "")
+        )
+
+        if topico_atual:
+            st.success("✅ Notificações pessoais ativadas.")
+            st.markdown("**O teu tópico ntfy** (guarda este valor):")
+            st.code(topico_atual, language=None)
+            st.markdown("""
+Subscreve este tópico no ntfy (➕) para receberes mensagens pessoais.
+Podes subscrever em vários dispositivos com o mesmo tópico.
+            """)
+            if st.button("❌ Desativar notificações pessoais", key="btn_desativar_ntfy"):
+                try:
+                    base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": ""})
+                    st.session_state.pop('ntfy_topic_ativo', None)
+                    st.success("Notificações pessoais desativadas.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+        else:
+            if st.button("🔔 Ativar Notificações Pessoais", key="btn_ativar_ntfy"):
+                novo_topico = gerar_topico_unico()
+                try:
+                    base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": novo_topico})
+                    st.session_state['ntfy_topic_ativo'] = novo_topico
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro: {e}")
+    
     # ========================================
     # TAB 3: INSTRUMENTO
     # ========================================
