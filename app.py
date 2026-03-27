@@ -63,131 +63,191 @@ div.viewerBadge { display: none !important; }
 # ============================================
 # HELPER: APLICAR TEMA VIA CSS
 # ============================================
-
 def aplicar_tema_css(dark):
-    tema_class = "tema-dark" if dark else "tema-light"
-    st.markdown(f"""
-    <style>
-    /* Aplicar classe ao root */
-    .stApp {{ --tema: '{tema_class}'; }}
+    if dark:
+        st.markdown("""
+        <style>
+        /* ===== DARK MODE ===== */
+        .stApp, [data-testid="stAppViewContainer"] {
+            background-color: #121212 !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #1f1f1f !important;
+            color: #f5f5f5 !important;
+        }
+        .stMarkdown p, .stMarkdown span, .stMarkdown label, [data-testid="stText"], [data-testid="stMarkdownContainer"] p { color: #f5f5f5; }
+        h1, h2, h3, h4 { color: #f5f5f5 !important; }
 
-    /* BOTÕES SECONDARY */
-    .stButton > button {{
-        background-color: {'#2d2d2d' if dark else '#f0f2f6'} !important;
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-        border: 1px solid {'#555' if dark else '#cccccc'} !important;
-    }}
-    .stButton > button p {{
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-    }}
-    .stButton > button:hover {{
-        background-color: {'#3d3d3d' if dark else '#e0e2e6'} !important;
-        border-color: #ff6b35 !important;
-    }}
+        /* Botões */
+        .stButton > button {
+            background-color: #2d2d2d !important;
+            color: #f5f5f5 !important;
+            border: 1px solid #555 !important;
+        }
+        .stButton > button:hover {
+            background-color: #3d3d3d !important;
+            border-color: #ff6b35 !important;
+        }
+        .stButton > button p { color: #f5f5f5 !important; }
 
-    /* BOTÕES PRIMARY */
-    .stButton > button[kind="primary"],
-    div[data-testid="stFormSubmitButton"] > button {{
-        background-color: #ff6b35 !important;
-        color: #ffffff !important;
-        border: none !important;
-    }}
-    .stButton > button[kind="primary"] p,
-    div[data-testid="stFormSubmitButton"] > button p {{
-        color: #ffffff !important;
-    }}
-    .stButton > button[kind="primary"]:hover,
-    div[data-testid="stFormSubmitButton"] > button:hover {{
-        background-color: #e05a28 !important;
-    }}
+        /* Inputs */
+        .stTextInput div div input,
+        .stTextArea div div textarea,
+        .stSelectbox div div {
+            background-color: #2a2a2a !important;
+            color: #f5f5f5 !important;
+            border-color: #444 !important;
+        }
 
-    /* FUNDO GERAL */
-    .stApp, [data-testid="stAppViewContainer"] {{
-        background-color: {'#121212' if dark else '#ffffff'} !important;
-    }}
-    [data-testid="stSidebar"] {{
-        background-color: {'#1f1f1f' if dark else '#f0f2f6'} !important;
-    }}
+        /* Date input */
+        .stDateInput input {
+            color-scheme: dark;
+            background-color: #2a2a2a !important;
+            color: #f5f5f5 !important;
+        }
+        input[type="date"] { color-scheme: dark; }
 
-    /* TEXTO */
-    .stMarkdown p, .stMarkdown span, .stMarkdown li,
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] span,
-    label[data-testid="stWidgetLabel"] p,
-    .stTextInput label, .stSelectbox label,
-    .stDateInput label, .stTextArea label,
-    .stNumberInput label, .stCheckbox label {{
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-    }}
-    h1, h2, h3, h4, h5, h6 {{
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-    }}
+        /* Dropdowns abertos */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"] {
+            background-color: #2a2a2a !important;
+        }
+        div[data-baseweb="menu"] li,
+        div[data-baseweb="select"] [role="option"] {
+            background-color: #2a2a2a !important;
+            color: #f5f5f5 !important;
+        }
+        div[data-baseweb="menu"] li:hover {
+            background-color: #3d3d3d !important;
+        }
 
-    /* INPUTS */
-    .stTextInput div div input,
-    .stTextArea div div textarea,
-    .stNumberInput div div input,
-    .stSelectbox > div > div {{
-        background-color: {'#2a2a2a' if dark else '#ffffff'} !important;
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-        border-color: {'#444' if dark else '#cccccc'} !important;
-    }}
+        /* Tags multiselect */
+        div[data-baseweb="tag"] {
+            background-color: #ff6b35 !important;
+            color: #ffffff !important;
+        }
 
-    /* DATE INPUT */
-    .stDateInput input {{
-        color-scheme: {'dark' if dark else 'light'} !important;
-        background-color: {'#2a2a2a' if dark else '#ffffff'} !important;
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-    }}
+        /* Expander e Forms */
+        .stExpander {
+            background-color: #1f1f1f !important;
+            border-color: #444 !important;
+        }
+        [data-testid="stForm"] {
+            background-color: #1f1f1f !important;
+            border-color: #444 !important;
+        }
 
-    /* DROPDOWNS */
-    div[data-baseweb="popover"],
-    div[data-baseweb="menu"],
-    ul[data-baseweb="menu"] {{
-        background-color: {'#2a2a2a' if dark else '#ffffff'} !important;
-        border: 1px solid {'#555' if dark else '#ccc'} !important;
-    }}
-    li[role="option"], div[role="option"] {{
-        background-color: {'#2a2a2a' if dark else '#ffffff'} !important;
-        color: {'#f5f5f5' if dark else '#000000'} !important;
-    }}
-    li[role="option"]:hover {{
-        background-color: {'#3d3d3d' if dark else '#f0f2f6'} !important;
-    }}
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] { background-color: #1f1f1f !important; }
+        .stTabs [data-baseweb="tab"] { color: #f5f5f5 !important; }
+        .stTabs [aria-selected="true"] {
+            color: #ff6b35 !important;
+            border-bottom-color: #ff6b35 !important;
+        }
 
-    /* TAGS MULTISELECT */
-    div[data-baseweb="tag"] {{
-        background-color: #ff6b35 !important;
-        color: #ffffff !important;
-    }}
+        /* DataFrames */
+        .stDataFrame { background-color: #1f1f1f !important; }
 
-    /* EXPANDER */
-    .stExpander {{
-        background-color: {'#1f1f1f' if dark else '#f0f2f6'} !important;
-        border-color: {'#444' if dark else '#cccccc'} !important;
-    }}
+        /* Métricas */
+        div[data-testid="metric-container"] {
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        /* ===== LIGHT MODE ===== */
+        .stApp, [data-testid="stAppViewContainer"] {
+            background-color: #ffffff !important;
+        }
+        [data-testid="stSidebar"] {
+            background-color: #f0f2f6 !important;
+            color: #000000 !important;
+        }
+        .stMarkdown p, .stMarkdown span, .stMarkdown label, [data-testid="stText"], [data-testid="stMarkdownContainer"] p { color: #000000; }
+        h1, h2, h3, h4 { color: #000000 !important; }
 
-    /* FORMS */
-    [data-testid="stForm"] {{
-        background-color: {'#1f1f1f' if dark else '#f8f9fa'} !important;
-        border-color: {'#444' if dark else '#e0e0e0'} !important;
-    }}
+        /* Botões */
+        .stButton > button {
+            background-color: #f0f2f6 !important;
+            color: #000000 !important;
+            border: 1px solid #cccccc !important;
+        }
+        .stButton > button:hover {
+            background-color: #e0e2e6 !important;
+            border-color: #ff6b35 !important;
+        }
+        .stButton > button p { color: #000000 !important; }
 
-    /* TABS */
-    .stTabs [data-baseweb="tab-list"] {{
-        background-color: {'#1f1f1f' if dark else '#f0f2f6'} !important;
-    }}
-    .stTabs [data-baseweb="tab"] {{
-        color: {'#f5f5f5' if dark else '#555555'} !important;
-    }}
-    .stTabs [aria-selected="true"] {{
-        color: #ff6b35 !important;
-        border-bottom-color: #ff6b35 !important;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+        /* Inputs */
+        .stTextInput div div input,
+        .stTextArea div div textarea,
+        .stSelectbox div div {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+            border-color: #cccccc !important;
+        }
 
+        /* Date input — fix fundo preto */
+        .stDateInput input {
+            color-scheme: light !important;
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        input[type="date"] { color-scheme: light !important; }
 
+        /* Dropdowns abertos — fix fundo escuro */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"] {
+            background-color: #ffffff !important;
+        }
+        div[data-baseweb="menu"] li,
+        div[data-baseweb="select"] [role="option"] {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+        }
+        div[data-baseweb="menu"] li:hover {
+            background-color: #f0f2f6 !important;
+        }
+
+        /* Tags multiselect */
+        div[data-baseweb="tag"] {
+            background-color: #ff6b35 !important;
+            color: #ffffff !important;
+        }
+
+        /* Expander e Forms */
+        .stExpander {
+            background-color: #f0f2f6 !important;
+            border-color: #cccccc !important;
+        }
+        [data-testid="stForm"] {
+            background-color: #f0f2f6 !important;
+            border-color: #cccccc !important;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] { background-color: #f0f2f6 !important; }
+        .stTabs [data-baseweb="tab"] { color: #000000 !important; }
+        .stTabs [aria-selected="true"] {
+            color: #ff6b35 !important;
+            border-bottom-color: #ff6b35 !important;
+        }
+
+        /* DataFrames */
+        .stDataFrame { background-color: #ffffff !important; }
+
+        /* Métricas */
+        div[data-testid="metric-container"] {
+            background-color: #f0f2f6;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
 # ============================================
 # HELPER: DETECTAR ERRO 429
