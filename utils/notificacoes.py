@@ -5,7 +5,7 @@ import requests
 import uuid
 
 NTFY_BASE = "https://ntfy.sh"
-TOPICO_GERAL = "bmo-oeiras-geral-2026"
+TOPICO_GERAL = "amo-bmo-geral"
 
 
 def gerar_topico_unico():
