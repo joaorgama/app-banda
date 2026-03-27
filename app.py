@@ -71,13 +71,7 @@ def aplicar_tema_css(dark):
     /* Aplicar classe ao root */
     .stApp {{ --tema: '{tema_class}'; }}
 
-    /* ===== DARK ===== */
-    .tema-dark-ativo .stButton > button,
-    .stApp[data-tema="dark"] .stButton > button {{ }}
-
-    /* Em vez de classes, usamos uma única regra baseada no valor actual */
-
-    /* BOTÕES */
+    /* BOTÕES SECONDARY */
     .stButton > button {{
         background-color: {'#2d2d2d' if dark else '#f0f2f6'} !important;
         color: {'#f5f5f5' if dark else '#000000'} !important;
@@ -91,6 +85,22 @@ def aplicar_tema_css(dark):
         border-color: #ff6b35 !important;
     }}
 
+    /* BOTÕES PRIMARY */
+    .stButton > button[kind="primary"],
+    div[data-testid="stFormSubmitButton"] > button {{
+        background-color: #ff6b35 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }}
+    .stButton > button[kind="primary"] p,
+    div[data-testid="stFormSubmitButton"] > button p {{
+        color: #ffffff !important;
+    }}
+    .stButton > button[kind="primary"]:hover,
+    div[data-testid="stFormSubmitButton"] > button:hover {{
+        background-color: #e05a28 !important;
+    }}
+
     /* FUNDO GERAL */
     .stApp, [data-testid="stAppViewContainer"] {{
         background-color: {'#121212' if dark else '#ffffff'} !important;
@@ -99,7 +109,7 @@ def aplicar_tema_css(dark):
         background-color: {'#1f1f1f' if dark else '#f0f2f6'} !important;
     }}
 
-    /* TEXTO — seletores específicos, não "div" genérico */
+    /* TEXTO */
     .stMarkdown p, .stMarkdown span, .stMarkdown li,
     [data-testid="stMarkdownContainer"] p,
     [data-testid="stMarkdownContainer"] span,
@@ -176,6 +186,7 @@ def aplicar_tema_css(dark):
     }}
     </style>
     """, unsafe_allow_html=True)
+
 
 
 # ============================================
