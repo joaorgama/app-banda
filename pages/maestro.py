@@ -503,15 +503,17 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
 def render(base, user):
     st.title("🎼 Painel do Maestro")
 
-    t1, t2, t3, t4, t5, t6, t7 = st.tabs([
-        "🎼 Reportório",
-        "📅 Agenda de Eventos",
-        "🥁 Ensaios",
-        "🖼️ Galeria",
-        "💬 Mensagens",
-        "🎂 Aniversários",
-        "👥 Alunos"
-    ])
+t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
+    "🎼 Reportório",
+    "📅 Agenda de Eventos",
+    "🥁 Ensaios",
+    "🖼️ Galeria",
+    "💬 Mensagens",
+    "🎂 Aniversários",
+    "👥 Alunos",
+    "🎺 Músicos"
+])
+
 
     # ========================================
     # TAB 1: REPORTÓRIO
@@ -1128,3 +1130,118 @@ def render(base, user):
 
         except Exception as e:
             st.error(f"❌ Erro ao carregar alunos: {e}")
+
+    # ========================================
+    # TAB 8: MÚSICOS (consulta)
+    # ========================================
+    with t8:
+        st.subheader("🎺 Músicos da Banda")
+
+        try:
+            musicos = get_musicos_cached()
+
+            if not musicos:
+                st.info("📭 Sem músicos registados")
+            else:
+                # Métricas rápidas
+                instrumentos = [str(m.get("Instrumento", "") or "").strip() for m in musicos]
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Total de Músicos", len(musicos))
+                col2.metric("Instrumentos Diferentes", len(set(i for i in instrumentos if i)))
+                col3.metric("Com Instrumento Próprio",
+                            sum(1 for m in musicos if str(m.get("Instrumento Proprio", "") or "").strip()))
+
+                st.divider()
+
+                # Pesquisa e filtros
+                col_p1, col_p2 = st.columns([3, 1])
+                with col_p1:
+                    pesquisa_m = st.text_input("🔍 Pesquisar músico",
+                                               placeholder="Nome, instrumento ou username...")
+                with col_p2:
+                    lista_inst = sorted(set(i for i in instrumentos if i))
+                    filtro_inst = st.selectbox("Instrumento", ["Todos"] + lista_inst)
+
+                musicos_f = musicos
+                if pesquisa_m.strip():
+                    termo = pesquisa_m.strip().lower()
+                    musicos_f = [
+                        m for m in musicos_f
+                        if termo in str(m.get("Nome", "")).lower()
+                        or termo in str(m.get("Instrumento", "")).lower()
+                        or termo in str(m.get("Username", "")).lower()
+                    ]
+                if filtro_inst != "Todos":
+                    musicos_f = [
+                        m for m in musicos_f
+                        if str(m.get("Instrumento", "") or "").strip() == filtro_inst
+                    ]
+
+                # Ordenar por instrumento e nome
+                musicos_f = sorted(musicos_f, key=lambda m: (
+                    str(m.get("Instrumento", "") or ""),
+                    str(m.get("Nome", "") or "")
+                ))
+
+                st.caption(f"A mostrar {len(musicos_f)} de {len(musicos)} músicos")
+                st.divider()
+
+                for m in musicos_f:
+                    nome     = str(m.get("Nome", "---") or "---")
+                    inst     = str(m.get("Instrumento", "---") or "---")
+                    username = str(m.get("Username", "") or "")
+                    morada   = str(m.get("Morada", "") or "")
+                    email    = str(m.get("Email", "") or "")
+                    telefone = str(m.get("Telefone", "") or "")
+                    marca    = str(m.get("Marca", "") or "")
+                    modelo   = str(m.get("Modelo", "") or "")
+                    num_serie = str(m.get("Num Serie", "") or "")
+                    inst_proprio = str(m.get("Instrumento Proprio", "") or "")
+                    data_nasc = converter_data_robusta(m.get("Data de Nascimento"))
+                    data_ing  = converter_data_robusta(m.get("Data Ingresso Banda"))
+                    obs       = str(m.get("Obs", "") or "")
+
+                    inst_label = f"🎵 {inst}" if inst != "---" else "🎵 Sem instrumento"
+
+                    with st.expander(f"🎺 {nome} — {inst_label}"):
+                        col1, col2, col3 = st.columns([3, 3, 2])
+
+                        with col1:
+                            st.write(f"👤 **Username:** {username or '---'}")
+                            st.write(f"📞 **Telefone:** {telefone or '---'}")
+                            st.write(f"📧 **Email:** {email or '---'}")
+                            st.write(f"🏠 **Morada:** {morada or '---'}")
+
+                        with col2:
+                            st.write(f"🎂 **Nascimento:** {formatar_data_pt(str(data_nasc)) if data_nasc else '---'}")
+                            st.write(f"📅 **Ingresso na Banda:** {formatar_data_pt(str(data_ing)) if data_ing else '---'}")
+                            if obs:
+                                st.write(f"📝 **Obs:** {obs}")
+
+                        with col3:
+                            st.markdown("**🎷 Instrumento**")
+                            st.write(f"Tipo: **{inst}**")
+                            if marca:
+                                st.write(f"Marca: {marca}")
+                            if modelo:
+                                st.write(f"Modelo: {modelo}")
+                            if num_serie:
+                                st.write(f"Nº Série: {num_serie}")
+                            if inst_proprio:
+                                st.success("✅ Instrumento próprio")
+                            else:
+                                st.caption("🏛️ Instrumento da banda")
+
+                        # Foto se existir
+                        foto = m.get("Foto")
+                        if foto:
+                            try:
+                                if isinstance(foto, list) and foto:
+                                    st.image(foto[0], width=100)
+                                elif isinstance(foto, str) and foto.startswith("http"):
+                                    st.image(foto, width=100)
+                            except Exception:
+                                pass
+
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar músicos: {e}")
