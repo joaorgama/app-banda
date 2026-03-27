@@ -1403,21 +1403,9 @@ def render(base, user):
     
         # Botão de teste
         if st.button("🧪 Teste ntfy (canal geral)", key="btn_teste_ntfy"):
-            try:
-                import requests
-                from notificacoes import TOPICO_GERAL  # ou utils.notificacoes
-                r = requests.post(
-                    f"https://ntfy.sh/{TOPICO_GERAL}",
-                    data="Teste BMO".encode("utf-8"),
-                    headers={"Title": "Teste"},
-                    timeout=5
-                )
-                st.write(f"Status: {r.status_code}")
-                st.write(f"Resposta: {r.text}")
-            except Exception as e:
-                st.error(f"Erro: {e}")
-    
-        st.divider()
+            from notificacoes import enviar_notificacao, TOPICO_GERAL
+            ok = enviar_notificacao(TOPICO_GERAL, "🧪 Teste BMO", "Se recebes isto, o ntfy está a funcionar!")
+            st.success("✅ Enviado!") if ok else st.error("❌ Falhou")
     
         if st.button("📤 Enviar Notificação", type="primary", key="btn_enviar_ntfy"):
             if not titulo_notif or not mensagem_notif:
