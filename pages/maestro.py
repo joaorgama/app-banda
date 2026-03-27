@@ -810,6 +810,76 @@ def render(base, user):
     with t7:
         st.subheader("👥 Alunos da Escola")
 
+        # --- Carregar lista de professores da BD ---
+        try:
+            lista_professores = base.list_rows("Professores")
+            nomes_professores = [""] + sorted([
+                str(p.get("Nome", "")).strip()
+                for p in lista_professores
+                if str(p.get("Nome", "")).strip()
+            ])
+        except Exception:
+            lista_professores = []
+            nomes_professores = [""]
+
+        # --- Gerir Professores ---
+        with st.expander("👨‍🏫 Gerir Lista de Professores", expanded=False):
+            col_add, col_list = st.columns([1, 2])
+
+            with col_add:
+                st.markdown("**Adicionar Professor**")
+                with st.form("form_add_professor"):
+                    novo_prof_nome  = st.text_input("Nome*", placeholder="Ex: Prof. António")
+                    novo_prof_inst  = st.text_input("Instrumento", placeholder="Ex: Clarinete, Trompete")
+                    novo_prof_email = st.text_input("Email", placeholder="")
+                    novo_prof_tel   = st.text_input("Telefone", placeholder="")
+                    if st.form_submit_button("➕ Adicionar", use_container_width=True, type="primary"):
+                        if not novo_prof_nome.strip():
+                            st.error("O nome é obrigatório")
+                        else:
+                            try:
+                                base.append_row("Professores", {
+                                    "Nome":        novo_prof_nome.strip(),
+                                    "Instrumento": novo_prof_inst.strip(),
+                                    "Email":       novo_prof_email.strip(),
+                                    "Telefone":    novo_prof_tel.strip(),
+                                })
+                                st.success(f"✅ Professor {novo_prof_nome} adicionado!")
+                                st.rerun()
+                            except Exception as ep:
+                                st.error(f"Erro: {ep}")
+
+            with col_list:
+                st.markdown("**Professores Registados**")
+                if not lista_professores:
+                    st.info("Nenhum professor registado ainda.")
+                else:
+                    for p in lista_professores:
+                        pid    = p.get("_id", "")
+                        pnome  = str(p.get("Nome", "") or "")
+                        pinst  = str(p.get("Instrumento", "") or "---")
+                        col_a, col_b = st.columns([4, 1])
+                        with col_a:
+                            st.write(f"👨‍🏫 **{pnome}** — {pinst}")
+                        with col_b:
+                            confirm_key_p = f"confirm_del_prof_{pid}"
+                            if st.session_state.get(confirm_key_p, False):
+                                if st.button("✅", key=f"yes_del_prof_{pid}", help="Confirmar"):
+                                    try:
+                                        base.delete_row("Professores", pid)
+                                        st.session_state.pop(confirm_key_p, None)
+                                        st.success("Removido!")
+                                        st.rerun()
+                                    except Exception as ep:
+                                        st.error(f"Erro: {ep}")
+                            else:
+                                if st.button("🗑️", key=f"del_prof_{pid}", help="Remover professor"):
+                                    st.session_state[confirm_key_p] = True
+                                    st.rerun()
+
+        st.divider()
+
+        # --- Adicionar Novo Aluno ---
         with st.expander("➕ Adicionar Novo Aluno", expanded=False):
             with st.form("form_mae_novo_aluno"):
                 col1, col2 = st.columns(2)
@@ -821,8 +891,12 @@ def render(base, user):
                     novo_encarr   = st.text_input("Encarregado de Educação", placeholder="Ex: Maria Silva")
                 with col2:
                     novo_instrumento = st.text_input("Instrumento Pretendido", placeholder="Ex: Clarinete")
-                    novo_professor   = st.text_input("Professor", placeholder="Ex: Prof. António")
                     novo_polo        = st.selectbox("Pólo da Escola", ["", "Algés", "Oeiras", "Outro"])
+                    novo_professor   = st.selectbox(
+                        "Professor de Instrumento",
+                        options=nomes_professores,
+                        help="Deixar vazio se o aluno ainda só tem Formação Musical"
+                    )
                     try:
                         novo_nascimento = st.date_input("Data de Nascimento", value=None,
                                                         min_value=datetime(1920, 1, 1).date(),
@@ -837,6 +911,9 @@ def render(base, user):
                         novo_inicio = datetime.now().date()
                     novo_obs = st.text_area("Observações", placeholder="Notas adicionais...", height=80)
 
+                if not novo_professor:
+                    st.caption("ℹ️ Sem professor atribuído — aluno em Formação Musical")
+
                 st.caption("* Campos obrigatórios")
                 if st.form_submit_button("✅ Adicionar Aluno", use_container_width=True, type="primary"):
                     if not novo_nome.strip():
@@ -850,8 +927,8 @@ def render(base, user):
                                 "Morada":                  novo_morada.strip() if novo_morada else "",
                                 "Encarregado de Educação": novo_encarr.strip() if novo_encarr else "",
                                 "Instrumento Pretendido":  novo_instrumento.strip() if novo_instrumento else "",
-                                "Professor":               novo_professor.strip() if novo_professor else "",
                                 "Pólo da escola":          novo_polo if novo_polo else "",
+                                "Professor":               novo_professor if novo_professor else "",
                                 "Obs":                     novo_obs.strip() if novo_obs else "",
                             }
                             if novo_nascimento:
@@ -859,31 +936,35 @@ def render(base, user):
                             if novo_inicio:
                                 dados_aluno["Data de Ingresso na ..."] = str(novo_inicio)
                             base.append_row("Alunos", dados_aluno)
-                            st.success(f"✅ Aluno **{novo_nome}** adicionado com sucesso!")
+                            st.success(f"✅ Aluno **{novo_nome}** adicionado!")
                             st.rerun()
                         except Exception as e_add:
-                            st.error(f"Erro ao adicionar aluno: {e_add}")
+                            st.error(f"Erro: {e_add}")
 
         st.divider()
 
+        # --- Lista de Alunos ---
         try:
             alunos = base.list_rows("Alunos")
             if not alunos:
                 st.info("📭 Nenhum aluno registado")
             else:
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Total de Alunos", len(alunos))
                 polos = [str(a.get("Pólo da escola", "") or "").strip() for a in alunos]
                 col2.metric("Pólo Algés",  sum(1 for p in polos if "algés" in p.lower() or "alges" in p.lower()))
                 col3.metric("Pólo Oeiras", sum(1 for p in polos if "oeiras" in p.lower()))
+                col4.metric("Com Professor", sum(1 for a in alunos if str(a.get("Professor", "") or "").strip()))
 
                 st.divider()
 
-                col_p1, col_p2 = st.columns([3, 1])
+                col_p1, col_p2, col_p3 = st.columns([3, 1, 1])
                 with col_p1:
                     pesquisa = st.text_input("🔍 Pesquisar aluno", placeholder="Nome, instrumento ou professor...")
                 with col_p2:
                     filtro_polo = st.selectbox("Filtrar por pólo", ["Todos", "Algés", "Oeiras", "Outro", "Sem pólo"])
+                with col_p3:
+                    filtro_prof = st.selectbox("Professor", ["Todos", "Com professor", "Só Formação Musical"])
 
                 alunos_filtrados = alunos
                 if pesquisa.strip():
@@ -903,6 +984,10 @@ def render(base, user):
                             a for a in alunos_filtrados
                             if filtro_polo.lower() in str(a.get("Pólo da escola", "") or "").lower()
                         ]
+                if filtro_prof == "Com professor":
+                    alunos_filtrados = [a for a in alunos_filtrados if str(a.get("Professor", "") or "").strip()]
+                elif filtro_prof == "Só Formação Musical":
+                    alunos_filtrados = [a for a in alunos_filtrados if not str(a.get("Professor", "") or "").strip()]
 
                 st.caption(f"A mostrar {len(alunos_filtrados)} de {len(alunos)} alunos")
                 st.divider()
@@ -912,12 +997,14 @@ def render(base, user):
                     aluno_nome = a.get("Nome", "Sem nome")
                     aluno_inst = a.get("Instrumento Pretendido", "---")
                     aluno_polo = a.get("Pólo da escola", "---")
+                    aluno_prof = str(a.get("Professor", "") or "")
+                    fase_label = f"👨‍🏫 {aluno_prof}" if aluno_prof else "🎼 Formação Musical"
 
                     edit_key_a = f"mae_edit_aluno_{aid}"
                     if edit_key_a not in st.session_state:
                         st.session_state[edit_key_a] = False
 
-                    with st.expander(f"👤 {aluno_nome} — {aluno_inst} | {aluno_polo}"):
+                    with st.expander(f"👤 {aluno_nome} — {aluno_inst} | {aluno_polo} | {fase_label}"):
                         if st.session_state[edit_key_a]:
                             st.markdown("#### ✏️ Editar Aluno")
                             with st.form(f"form_mae_edit_aluno_{aid}"):
@@ -932,11 +1019,17 @@ def render(base, user):
                                 with ec2:
                                     e_instr  = st.text_input("Instrumento Pretendido",
                                                              value=str(a.get("Instrumento Pretendido", "") or ""))
-                                    e_prof   = st.text_input("Professor", value=str(a.get("Professor", "") or ""))
                                     polos_opts = ["", "Algés", "Oeiras", "Outro"]
                                     polo_atual = str(a.get("Pólo da escola", "") or "")
                                     e_polo   = st.selectbox("Pólo da Escola", polos_opts,
                                                             index=polos_opts.index(polo_atual) if polo_atual in polos_opts else 0)
+                                    prof_atual = str(a.get("Professor", "") or "")
+                                    e_prof = st.selectbox(
+                                        "Professor de Instrumento",
+                                        options=nomes_professores,
+                                        index=nomes_professores.index(prof_atual) if prof_atual in nomes_professores else 0,
+                                        help="Deixar vazio se o aluno ainda só tem Formação Musical"
+                                    )
                                     nasc_raw = a.get("Data de Nascimento")
                                     try:
                                         nasc_val = datetime.strptime(str(nasc_raw)[:10], "%Y-%m-%d").date() if nasc_raw else None
@@ -954,6 +1047,9 @@ def render(base, user):
                                                           min_value=datetime(1900, 1, 1).date(),
                                                           max_value=datetime.now().date())
                                     e_obs = st.text_area("Observações", value=str(a.get("Obs", "") or ""), height=80)
+
+                                if not e_prof:
+                                    st.caption("ℹ️ Sem professor — aluno em Formação Musical")
 
                                 col_s, col_c = st.columns(2)
                                 with col_s:
@@ -973,8 +1069,8 @@ def render(base, user):
                                                 "Morada":                  e_morada.strip(),
                                                 "Encarregado de Educação": e_encarr.strip(),
                                                 "Instrumento Pretendido":  e_instr.strip(),
-                                                "Professor":               e_prof.strip(),
                                                 "Pólo da escola":          e_polo,
+                                                "Professor":               e_prof if e_prof else "",
                                                 "Data de Nascimento":      str(e_nasc) if e_nasc else "",
                                                 "Data de Ingresso na ...": str(e_ing) if e_ing else "",
                                                 "Obs":                     e_obs.strip(),
@@ -1000,14 +1096,16 @@ def render(base, user):
                                 st.write(f"🎂 **Nascimento:** {formatar_data_pt(str(nasc)) if nasc else '---'}")
                                 st.write(f"📅 **Ingresso:** {formatar_data_pt(str(ing)) if ing else '---'}")
                                 st.write(f"🎵 **Instrumento:** {a.get('Instrumento Pretendido') or '---'}")
-                                st.write(f"👨‍🏫 **Professor:** {a.get('Professor') or '---'}")
+                                if aluno_prof:
+                                    st.write(f"👨‍🏫 **Professor:** {aluno_prof}")
+                                else:
+                                    st.write("🎼 **Fase:** Formação Musical")
                                 if a.get("Obs"):
                                     st.write(f"📝 **Obs:** {a.get('Obs')}")
                             with col3:
                                 if st.button("✏️ Editar", key=f"mae_btn_edit_a_{aid}", use_container_width=True):
                                     st.session_state[edit_key_a] = True
                                     st.rerun()
-
                                 confirm_del_a = f"mae_confirm_del_aluno_{aid}"
                                 if st.session_state.get(confirm_del_a, False):
                                     st.warning("Apagar?")
@@ -1016,7 +1114,7 @@ def render(base, user):
                                         try:
                                             base.delete_row("Alunos", aid)
                                             st.session_state.pop(confirm_del_a, None)
-                                            st.success("✅ Aluno removido!")
+                                            st.success("✅ Removido!")
                                             st.rerun()
                                         except Exception as e_del:
                                             st.error(f"Erro: {e_del}")
