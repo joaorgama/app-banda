@@ -503,17 +503,16 @@ def _render_gestao_ensaios_maestro(base, ensaios, faltas, musicos):
 def render(base, user):
     st.title("🎼 Painel do Maestro")
 
-t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
-    "🎼 Reportório",
-    "📅 Agenda de Eventos",
-    "🥁 Ensaios",
-    "🖼️ Galeria",
-    "💬 Mensagens",
-    "🎂 Aniversários",
-    "👥 Alunos",
-    "🎺 Músicos"
-])
-
+    t1, t2, t3, t4, t5, t6, t7, t8 = st.tabs([
+        "🎼 Reportório",
+        "📅 Agenda de Eventos",
+        "🥁 Ensaios",
+        "🖼️ Galeria",
+        "💬 Mensagens",
+        "🎂 Aniversários",
+        "👥 Alunos",
+        "🎺 Músicos"
+    ])
 
     # ========================================
     # TAB 1: REPORTÓRIO
