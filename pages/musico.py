@@ -1,6 +1,7 @@
 """
 Interface do Músico - Portal BMO
 """
+from notificacoes import gerar_topico_unico
 import streamlit as st
 import time
 import calendar
@@ -481,6 +482,44 @@ def render(base, user):
                     height=100,
                     help="Rua, Código Postal, Localidade"
                 )
+
+                st.divider()
+                st.subheader("🔔 Notificações")
+                
+                topico_atual = m_row.get("Ntfy_Topic", "") if m_row else ""
+                
+                if topico_atual:
+                    st.success("✅ Notificações ativadas.")
+                    st.markdown(f"""
+                    **Para receber noutro dispositivo:**
+                    1. Instala a app **ntfy** no telemóvel
+                    2. Toca em ➕ e subscreve: `{topico_atual}`
+                    """)
+                    if st.button("❌ Desativar notificações", key="btn_desativar_ntfy"):
+                        try:
+                            base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": ""})
+                            get_utilizadores_cached.clear()
+                            st.success("Notificações desativadas.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+                else:
+                    st.info("Ativa para receberes avisos importantes da banda no telemóvel.")
+                    if st.button("🔔 Ativar Notificações", key="btn_ativar_ntfy"):
+                        novo_topico = gerar_topico_unico()
+                        try:
+                            base.update_row("Utilizadores", user['row_id'], {"Ntfy_Topic": novo_topico})
+                            get_utilizadores_cached.clear()
+                            st.success("✅ Notificações ativadas!")
+                            st.markdown(f"""
+                            **Como configurar:**
+                            1. Instala a app **ntfy** no telemóvel
+                            2. Toca em ➕ e subscreve: `{novo_topico}`
+                            3. Pronto — recebes notificações mesmo com a app fechada!
+                            """)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
 
                 if st.form_submit_button("💾 Guardar Alterações", use_container_width=True):
                     try:
