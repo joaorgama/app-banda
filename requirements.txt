@@ -3,3 +3,4 @@ pandas
 seatable-api
 bcrypt==4.1.2
 unidecode
+requests
