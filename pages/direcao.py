@@ -514,7 +514,7 @@ def render(base, user):
     
     st.title("📊 Painel da Direção")
 
-    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11 = st.tabs([
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12 = st.tabs([
         "📅 Eventos",
         "🥁 Ensaios",
         "🎷 Inventário",
@@ -525,7 +525,8 @@ def render(base, user):
         "👥 Utilizadores",
         "👤 Músicos",
         "🖼️ Galeria",
-        "🔔 Notificações"
+        "🔔 Notificações",
+        "👨‍🏫 Professores"
     ])
 
    
@@ -971,6 +972,22 @@ def render(base, user):
                     else:
                         st.info("✨ Todos os músicos já têm conta!")
         st.divider()
+
+        st.subheader("👨‍🏫 Sincronizar Professores")
+        st.caption("Cria contas de acesso para professores que ainda não têm utilizador.")
+        if st.button("👨‍🏫 Sincronizar Professores", use_container_width=True, key="btn_sync_profs"):
+            with st.spinner("A criar contas para professores..."):
+                from user_sync import sincronizar_professores_utilizadores
+                resultado = sincronizar_professores_utilizadores(base)
+                if resultado["erro"]:
+                    st.warning(f"⚠️ {resultado['criados']} criado(s). Erros: {resultado['erro']}")
+                elif resultado["criados"] > 0:
+                    st.success(f"✅ {resultado['criados']} professor(es) sincronizado(s)!")
+                    st.rerun()
+                else:
+                    st.info("✨ Todos os professores já têm conta!")
+        st.divider()
+        
         st.markdown("### 📋 Lista de Utilizadores")
         try:
             utilizadores = get_utilizadores_cached()
@@ -1424,3 +1441,136 @@ def render(base, user):
                     elif tipo_envio == "🎷 Por Instrumento" and instrumento_sel:
                         n = enviar_para_instrumento(base, instrumento_sel, titulo_notif, mensagem_notif, prioridade)
                         st.success(f"✅ Enviado para {n} músico(s) com {instrumento_sel}.")
+
+    # ========================================
+    # TAB 12: PROFESSORES
+    # ========================================
+    with t12:
+        st.subheader("👨‍🏫 Professores")
+
+        try:
+            professores_raw = base.list_rows("Professores")
+        except Exception as e:
+            st.error(f"Erro ao carregar professores: {e}")
+            professores_raw = []
+
+        df_profs = pd.DataFrame(professores_raw) if professores_raw else pd.DataFrame()
+
+        # Métricas
+        if not df_profs.empty:
+            c1, c2, c3 = st.columns(3)
+            c1.metric("👨‍🏫 Total", len(df_profs))
+            com_email = sum(1 for _, r in df_profs.iterrows() if str(r.get('Email','')).strip() not in ['','None','nan']) \
+                if 'Email' in df_profs.columns else 0
+            c2.metric("📧 Com Email", com_email)
+            com_tel = sum(1 for _, r in df_profs.iterrows() if str(r.get('Telefone','')).strip() not in ['','None','nan']) \
+                if 'Telefone' in df_profs.columns else 0
+            c3.metric("📞 Com Telefone", com_tel)
+            st.divider()
+
+        # Formulário Adicionar
+        with st.expander("➕ Adicionar Novo Professor"):
+            with st.form("form_add_prof"):
+                p1, p2 = st.columns(2)
+                with p1:
+                    novo_nome  = st.text_input("Nome*",        placeholder="Nome completo")
+                    novo_instr = st.text_input("Instrumento*", placeholder="Ex: Trompete")
+                with p2:
+                    novo_email = st.text_input("Email",    placeholder="email@exemplo.com")
+                    novo_tel   = st.text_input("Telefone", placeholder="9XXXXXXXX")
+                if st.form_submit_button("✅ Adicionar Professor", use_container_width=True, type="primary"):
+                    if not novo_nome.strip() or not novo_instr.strip():
+                        st.error("⚠️ Nome e Instrumento são obrigatórios")
+                    else:
+                        try:
+                            base.append_row("Professores", {
+                                "Nome":        novo_nome.strip(),
+                                "Instrumento": novo_instr.strip(),
+                                "Email":       novo_email.strip(),
+                                "Telefone":    novo_tel.strip(),
+                            })
+                            st.success(f"✅ **{novo_nome}** adicionado! Vai a **Utilizadores → Sincronizar Professores** para criar a conta.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+
+        st.divider()
+
+        # Pesquisa
+        pesq = st.text_input("🔍 Pesquisar", placeholder="Nome ou instrumento...", key="pesq_prof_dir")
+
+        if df_profs.empty:
+            st.info("📭 Ainda não existem professores registados.")
+        else:
+            for _, prof in df_profs.iterrows():
+                nome_p  = str(prof.get('Nome',''))        .strip() or 'Sem nome'
+                instr_p = str(prof.get('Instrumento','')) .strip() or '---'
+                email_p = str(prof.get('Email',''))       .strip() or '---'
+                tel_p   = str(prof.get('Telefone',''))    .strip() or '---'
+                row_id  = prof.get('_id')
+
+                if pesq.strip() and pesq.strip().lower() not in nome_p.lower() and pesq.strip().lower() not in instr_p.lower():
+                    continue
+
+                edit_key = f"edit_prof_dir_{row_id}"
+                if edit_key not in st.session_state:
+                    st.session_state[edit_key] = False
+
+                with st.expander(f"🎷 {nome_p} — {instr_p}"):
+                    if st.session_state[edit_key]:
+                        with st.form(f"form_edit_prof_{row_id}"):
+                            e1, e2 = st.columns(2)
+                            with e1:
+                                en = st.text_input("Nome*",        value=nome_p)
+                                ei = st.text_input("Instrumento*", value='' if instr_p=='---' else instr_p)
+                            with e2:
+                                ee = st.text_input("Email",    value='' if email_p=='---' else email_p)
+                                et = st.text_input("Telefone", value='' if tel_p=='---'   else tel_p)
+                            cs, cc = st.columns(2)
+                            with cs: guardar  = st.form_submit_button("💾 Guardar",   use_container_width=True, type="primary")
+                            with cc: cancelar = st.form_submit_button("❌ Cancelar",  use_container_width=True)
+                            if guardar:
+                                if not en.strip() or not ei.strip():
+                                    st.error("⚠️ Nome e Instrumento são obrigatórios")
+                                else:
+                                    try:
+                                        base.update_row("Professores", row_id, {
+                                            "Nome": en.strip(), "Instrumento": ei.strip(),
+                                            "Email": ee.strip(), "Telefone": et.strip(),
+                                        })
+                                        st.session_state[edit_key] = False
+                                        st.success("✅ Atualizado!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro: {e}")
+                            if cancelar:
+                                st.session_state[edit_key] = False
+                                st.rerun()
+                    else:
+                        ci, ca = st.columns([4, 1])
+                        with ci:
+                            st.write(f"🎷 **Instrumento:** {instr_p}")
+                            st.write(f"📧 **Email:** {email_p}")
+                            st.write(f"📞 **Telefone:** {tel_p}")
+                        with ca:
+                            if st.button("✏️ Editar", key=f"edit_btn_prof_{row_id}", use_container_width=True):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                            confirm_key = f"confirm_del_prof_{row_id}"
+                            if st.session_state.get(confirm_key, False):
+                                st.warning("Tens a certeza?")
+                                if st.button("✅ Sim", key=f"yes_prof_{row_id}", use_container_width=True, type="primary"):
+                                    try:
+                                        base.delete_row("Professores", row_id)
+                                        st.session_state.pop(confirm_key, None)
+                                        st.success("✅ Removido!")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro: {e}")
+                                if st.button("❌ Não", key=f"no_prof_{row_id}", use_container_width=True):
+                                    st.session_state[confirm_key] = False
+                                    st.rerun()
+                            else:
+                                if st.button("🗑️ Remover", key=f"rem_prof_{row_id}", use_container_width=True):
+                                    st.session_state[confirm_key] = True
+                                    st.rerun()
