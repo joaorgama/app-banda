@@ -159,3 +159,57 @@ def sincronizar_novos_utilizadores(base):
     
     except Exception as e:
         return {"criados": 0, "erro": str(e)}
+
+def sincronizar_professores_utilizadores(base):
+    """
+    Cria utilizadores para professores que ainda não têm conta.
+    Password padrão: "1234"
+    """
+    try:
+        professores = base.list_rows("Professores")
+        utilizadores = base.list_rows("Utilizadores")
+
+        if not professores:
+            return {"criados": 0, "erro": "Nenhum professor encontrado"}
+
+        usernames_existentes = set()
+        for u in utilizadores:
+            username = str(u.get('Username', '')).lower().strip()
+            if username and username != 'none':
+                usernames_existentes.add(username)
+
+        criados = 0
+        erros = []
+
+        for p in professores:
+            nome = p.get('Nome', '')
+            if not nome or str(nome).strip() == '' or str(nome).lower() == 'none':
+                continue
+
+            username = gerar_username(nome)
+            if not username or username == 'none':
+                erros.append(f"{nome}: Nome inválido para gerar username")
+                continue
+
+            if username in usernames_existentes:
+                continue
+
+            try:
+                base.append_row("Utilizadores", {
+                    "Nome":     nome,
+                    "Username": username,
+                    "Password": "1234",
+                    "Funcao":   "Professor"
+                })
+                criados += 1
+                usernames_existentes.add(username)
+            except Exception as e:
+                erros.append(f"{nome}: {str(e)}")
+
+        resultado = {"criados": criados, "erro": None}
+        if erros:
+            resultado["erro"] = "; ".join(erros[:5])
+        return resultado
+
+    except Exception as e:
+        return {"criados": 0, "erro": str(e)}
