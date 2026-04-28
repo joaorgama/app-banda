@@ -419,18 +419,18 @@ def _render_calendario(df_aulas, base=None):
             format_func=lambda d: f"{d} de {MESES_PT[mes]} — {len(aulas_por_dia[d])} aula(s)",
             key="cal_dia_detalhe"
         )
-        if dia_sel:
-            data_sel_obj = date(ano, mes, dia_sel)
-            cache_key = f"presencas_cache_{ano}_{mes}"
-            if cache_key not in st.session_state:
-                st.session_state[cache_key] = _carregar_presencas(base)
-            presencas_dict = st.session_state[cache_key]
+    if dia_sel:
+        data_sel_obj = date(ano, mes, dia_sel)
+        cache_key = f"presencas_cache_{ano}_{mes}"
+        if cache_key not in st.session_state:
+            st.session_state[cache_key] = _carregar_presencas(base)
+        presencas_dict = st.session_state[cache_key]
 
-            # filtrar só as aulas deste professor
-            aulas_do_dia = [
-                a for a in aulas_por_dia[dia_sel]
-                if not professor_nome or _sv(a.get('Professor', '')) == professor_nome
-            ]
+        # filtrar só as aulas deste professor
+        aulas_do_dia = [
+            a for a in aulas_por_dia[dia_sel]
+            if not professor_nome or _sv(a.get('Professor', '')) == professor_nome
+        ]
 
             st.markdown("---")
             for aula in sorted(aulas_do_dia, key=lambda a: _hora_norm(a.get('Hora', ''))):
