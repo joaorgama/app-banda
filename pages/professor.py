@@ -115,8 +115,175 @@ def _get_aulas_do_mes(df_aulas, ano, mes):
             aulas_por_dia[dia] = aulas_do_dia
     return aulas_por_dia
 
+# ============================================
+# PRESENÇAS
+# ============================================
 
-def _render_calendario(df_aulas):
+def _chave_presenca(professor, aluno, data_str, hora):
+    return f"{professor}|{aluno}|{data_str}|{hora}"
+
+
+def _carregar_presencas(base):
+    """Carrega todos os registos de presenças num dict indexado por chave."""
+    try:
+        rows = base.list_rows("Presencas_Aulas")
+        resultado = {}
+        for r in (rows or []):
+            chave = _chave_presenca(
+                r.get('Professor', ''), r.get('Aluno', ''),
+                r.get('Data', ''), r.get('Hora', '')
+            )
+            resultado[chave] = r
+        return resultado
+    except Exception:
+        return {}
+
+
+def _render_presenca_aula(base, aula, data_dia, presencas_dict, card_bg, card_color):
+    """Renderiza o formulário de presença para uma aula num dia específico."""
+    prof  = _sv(aula.get('Professor', '')) or '---'
+    aluno = _sv(aula.get('Aluno', ''))     or '---'
+    hora  = _hora_norm(aula.get('Hora', ''))
+    local = _sv(aula.get('Local', ''))     or '---'
+    data_str = str(data_dia)
+    mes_ref  = data_dia.strftime('%Y-%m')
+
+    chave   = _chave_presenca(prof, aluno, data_str, hora)
+    existente = presencas_dict.get(chave)
+
+    # Badge de estado
+    if existente:
+        estado_atual = existente.get('Estado_Aluno', '')
+        aula_dada    = existente.get('Aula_Dada', 'Sim')
+        badge_cor = {'Presente': '#27ae60', 'Falta Justificada': '#f39c12',
+                     'Falta Injustificada': '#e74c3c', '': '#888'}.get(estado_atual, '#888')
+        if aula_dada == 'Não':
+            badge_txt = '❌ Aula Cancelada'
+            badge_cor = '#8e44ad'
+        else:
+            badge_txt = estado_atual or '⏳ Por registar'
+    else:
+        badge_cor = '#555'
+        badge_txt = '⏳ Por registar'
+
+    edit_key = f"presenca_edit_{chave}"
+    if edit_key not in st.session_state:
+        st.session_state[edit_key] = False
+
+    # Cabeçalho da aula
+    col_info, col_badge, col_btn = st.columns([4, 2, 1])
+    with col_info:
+        st.markdown(
+            f"<div style='padding:6px 0'>"
+            f"🕐 <b>{hora}</b> &nbsp;|&nbsp; 👤 <b>{aluno}</b> &nbsp;|&nbsp; 📍 {local}"
+            f"</div>", unsafe_allow_html=True
+        )
+    with col_badge:
+        st.markdown(
+            f"<div style='background:{badge_cor};color:#fff;padding:4px 10px;"
+            f"border-radius:12px;font-size:.8rem;text-align:center;margin-top:4px'>"
+            f"{badge_txt}</div>", unsafe_allow_html=True
+        )
+    with col_btn:
+        btn_label = "✏️ Editar" if existente else "📝 Registar"
+        if st.button(btn_label, key=f"btn_{chave}", use_container_width=True):
+            st.session_state[edit_key] = not st.session_state[edit_key]
+            st.rerun()
+
+    if st.session_state[edit_key]:
+        with st.form(f"form_presenca_{chave}"):
+            st.markdown(f"##### 📋 Registo — {aluno} | {hora} | {data_str}")
+
+            # Aula dada pelo professor?
+            aula_dada_opts = ["Sim", "Não"]
+            aula_dada_default = existente.get('Aula_Dada', 'Sim') if existente else 'Sim'
+            aula_dada_sel = st.radio(
+                "A aula foi dada pelo professor?",
+                aula_dada_opts,
+                index=aula_dada_opts.index(aula_dada_default),
+                horizontal=True,
+                key=f"radio_dada_{chave}"
+            )
+
+            motivo_cancel = ''
+            if aula_dada_sel == 'Não':
+                motivo_default = existente.get('Motivo_Cancelamento', '') if existente else ''
+                motivo_cancel = st.text_input(
+                    "Motivo do cancelamento*",
+                    value=motivo_default,
+                    placeholder="Ex: Professor doente, feriado...",
+                    key=f"motivo_{chave}"
+                )
+
+            # Presença do aluno (só se a aula foi dada)
+            estado_aluno = 'Presente'
+            justificacao = ''
+            if aula_dada_sel == 'Sim':
+                estado_opts = ["Presente", "Falta Justificada", "Falta Injustificada"]
+                estado_default = existente.get('Estado_Aluno', 'Presente') if existente else 'Presente'
+                estado_aluno = st.radio(
+                    "Presença do aluno",
+                    estado_opts,
+                    index=estado_opts.index(estado_default) if estado_default in estado_opts else 0,
+                    horizontal=True,
+                    key=f"radio_estado_{chave}"
+                )
+                if estado_aluno == 'Falta Justificada':
+                    just_default = existente.get('Justificacao_Aluno', '') if existente else ''
+                    justificacao = st.text_input(
+                        "Justificação da falta*",
+                        value=just_default,
+                        placeholder="Ex: Doença, viagem...",
+                        key=f"just_{chave}"
+                    )
+            else:
+                estado_aluno = 'N/A'
+
+            cs, cc = st.columns(2)
+            with cs: guardar  = st.form_submit_button("💾 Guardar", type="primary", use_container_width=True)
+            with cc: cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
+
+            if guardar:
+                # Validações
+                if aula_dada_sel == 'Não' and not motivo_cancel.strip():
+                    st.error("⚠️ Indica o motivo do cancelamento.")
+                elif aula_dada_sel == 'Sim' and estado_aluno == 'Falta Justificada' and not justificacao.strip():
+                    st.error("⚠️ Indica a justificação da falta.")
+                else:
+                    registo = {
+                        "Professor":             prof,
+                        "Aluno":                 aluno,
+                        "Data":                  data_str,
+                        "Hora":                  hora,
+                        "Aula_Dada":             aula_dada_sel,
+                        "Motivo_Cancelamento":   motivo_cancel.strip(),
+                        "Estado_Aluno":          estado_aluno,
+                        "Justificacao_Aluno":    justificacao.strip(),
+                        "MesRef":                mes_ref,
+                    }
+                    try:
+                        if existente:
+                            base.update_row("Presencas_Aulas", existente['_id'], registo)
+                            st.success("✅ Presença atualizada!")
+                        else:
+                            base.append_row("Presencas_Aulas", registo)
+                            st.success("✅ Presença registada!")
+                        st.session_state[edit_key] = False
+                        # Limpar cache de presenças
+                        for k in list(st.session_state.keys()):
+                            if k.startswith('presencas_cache_'):
+                                del st.session_state[k]
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e}")
+
+            if cancelar:
+                st.session_state[edit_key] = False
+                st.rerun()
+
+        st.divider()
+
+def _render_calendario(df_aulas, base=None):
     hoje = date.today()
     dark = st.session_state.get('dark_mode', True)
     card_bg, card_color = _card_styles()
@@ -248,8 +415,20 @@ def _render_calendario(df_aulas):
         dia_sel = st.selectbox("Selecionar dia:", options=dias_lista,
                                format_func=lambda d: f"{d} de {MESES_PT[mes]} — {len(aulas_por_dia[d])} aula(s)",
                                key="cal_dia_detalhe")
+        
         if dia_sel:
+            data_sel_obj = date(ano, mes, dia_sel)
+
+            # Cache de presenças por sessão
+            cache_key = f"presencas_cache_{ano}_{mes}"
+            if cache_key not in st.session_state:
+                st.session_state[cache_key] = _carregar_presencas(base)
+            presencas_dict = st.session_state[cache_key]
+
+            st.markdown("#### 📋 Registo de Presenças")
+
             for aula in sorted(aulas_por_dia[dia_sel], key=lambda a: _hora_norm(a.get('Hora',''))):
+                # ── Cartão visual original ──────────────────────────
                 prof = _sv(aula.get('Professor','---')) or '---'
                 cor  = cores_prof.get(prof, '#888')
                 rec_str = "🔁" if _normalizar_recorrente(aula.get('Recorrente', False)) else "📌"
@@ -262,6 +441,11 @@ def _render_calendario(df_aulas):
                     f"📍 {_sv(aula.get('Local','---')) or '---'} &nbsp;|&nbsp; "
                     f"🏫 {_sv(aula.get('Sala','---')) or '---'}"
                     f"</div>", unsafe_allow_html=True)
+                # ── Formulário de presença ──────────────────────────
+                _render_presenca_aula(
+                    base, aula, data_sel_obj,
+                    presencas_dict, card_bg, card_color
+                )
 
 
 # ============================================
@@ -590,7 +774,7 @@ def render(base, user):
     # ========================================
     with t4:
         st.subheader("📅 Calendário de Aulas")
-        _render_calendario(df_aulas_todas)
+        _render_calendario(df_aulas_todas, base)
 
     # ========================================
     # TAB 5: REPORTÓRIO
