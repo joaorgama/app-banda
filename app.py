@@ -434,6 +434,7 @@ else:
         if user['role'] == 'Musico':
             musico.render(base, user)
         elif user['role'] == 'Professor':
+            pass  # temporariamente desativado
             # professor.render(base, user)
         elif user['role'] == 'Maestro':
             maestro.render(base, user)
