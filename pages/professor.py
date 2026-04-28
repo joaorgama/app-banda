@@ -428,29 +428,6 @@ def _render_calendario(df_aulas, base=None):
                     presencas_dict, card_bg, card_color
                 )
 
-            st.markdown("#### 📋 Registo de Presenças")
-
-            for aula in sorted(aulas_por_dia[dia_sel], key=lambda a: _hora_norm(a.get('Hora',''))):
-                # ── Cartão visual original ──────────────────────────
-                prof = _sv(aula.get('Professor','---')) or '---'
-                cor  = cores_prof.get(prof, '#888')
-                rec_str = "🔁" if _normalizar_recorrente(aula.get('Recorrente', False)) else "📌"
-                st.markdown(
-                    f"<div style='border-left:4px solid {cor};padding:6px 10px;margin:4px 0;"
-                    f"background:{card_bg};border-radius:0 6px 6px 0;color:{card_color};'>"
-                    f"{rec_str} 🕐 <b>{_hora_norm(aula.get('Hora','---'))}</b> &nbsp;|&nbsp; "
-                    f"👤 {_sv(aula.get('Aluno','---')) or '---'} &nbsp;|&nbsp; "
-                    f"👨‍🏫 {prof} &nbsp;|&nbsp; "
-                    f"📍 {_sv(aula.get('Local','---')) or '---'} &nbsp;|&nbsp; "
-                    f"🏫 {_sv(aula.get('Sala','---')) or '---'}"
-                    f"</div>", unsafe_allow_html=True)
-                # ── Formulário de presença ──────────────────────────
-                _render_presenca_aula(
-                    base, aula, data_sel_obj,
-                    presencas_dict, card_bg, card_color
-                )
-
-
 # ============================================
 # RENDER PRINCIPAL
 # ============================================
