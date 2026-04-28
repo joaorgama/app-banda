@@ -139,11 +139,15 @@ def _carregar_presencas(base):
 
 
 def _render_presenca_aula(base, aula, data_dia, presencas_dict, card_bg, card_color):
-    prof  = _sv(aula.get('Professor', '')) or '---'
-    aluno = _sv(aula.get('Aluno', ''))     or '---'
+    def _limpar(v):
+        s = _sv(v)
+        return '' if s.lower() in ('nan', 'none', '') else s
+
+    prof  = _limpar(aula.get('Professor', '')) or '---'
+    aluno = _limpar(aula.get('Aluno', ''))     or '---'
     hora  = _hora_norm(aula.get('Hora', ''))
-    local = _sv(aula.get('Local', ''))     or '---'
-    sala  = _sv(aula.get('Sala', ''))      or '---'
+    local = _limpar(aula.get('Local', ''))     or '---'
+    sala  = _limpar(aula.get('Sala', ''))
     rec_str = "🔁" if _normalizar_recorrente(aula.get('Recorrente', False)) else "📌"
     data_str = str(data_dia)
     mes_ref  = data_dia.strftime('%Y-%m')
@@ -176,7 +180,8 @@ def _render_presenca_aula(base, aula, data_dia, presencas_dict, card_bg, card_co
         st.markdown(
             f"<div style='padding:6px 0;color:{card_color}'>"
             f"{rec_str} 🕐 <b>{hora}</b> &nbsp;|&nbsp; "
-            f"👤 <b>{aluno}</b> &nbsp;|&nbsp; 📍 {local} &nbsp;|&nbsp; 🏫 {sala}"
+            f"👤 <b>{aluno}</b> &nbsp;|&nbsp; 📍 {local}"
+            + (f" &nbsp;|&nbsp; 🏫 {sala}" if sala else "")
             f"</div>", unsafe_allow_html=True
         )
     with col_badge:
@@ -421,8 +426,14 @@ def _render_calendario(df_aulas, base=None):
                 st.session_state[cache_key] = _carregar_presencas(base)
             presencas_dict = st.session_state[cache_key]
 
+            # filtrar só as aulas deste professor
+            aulas_do_dia = [
+                a for a in aulas_por_dia[dia_sel]
+                if not professor_nome or _sv(a.get('Professor', '')) == professor_nome
+            ]
+
             st.markdown("---")
-            for aula in sorted(aulas_por_dia[dia_sel], key=lambda a: _hora_norm(a.get('Hora', ''))):
+            for aula in sorted(aulas_do_dia, key=lambda a: _hora_norm(a.get('Hora', ''))):
                 _render_presenca_aula(
                     base, aula, data_sel_obj,
                     presencas_dict, card_bg, card_color
