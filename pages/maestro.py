@@ -631,7 +631,14 @@ def render(base, user):
                     except Exception:
                         return datetime.max.date()
 
-                eventos = sorted(eventos, key=_data_sort)
+                hoje_ev = date.today()
+                eventos = sorted(
+                    [e for e in eventos if _data_sort(e) >= hoje_ev],
+                    key=_data_sort
+                )
+
+                if not eventos:
+                    st.info("📭 Nenhum evento agendado")
 
                 for e in eventos:
                     eid = e['_id']
