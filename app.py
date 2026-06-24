@@ -22,7 +22,7 @@ from cache import (
     get_faltas_ensaios_cached
 )
 import musico
-# import professor
+import professor
 import maestro
 import direcao
 
@@ -434,8 +434,7 @@ else:
         if user['role'] == 'Musico':
             musico.render(base, user)
         elif user['role'] == 'Professor':
-            pass  # temporariamente desativado
-            # professor.render(base, user)
+            professor.render(base, user)
         elif user['role'] == 'Maestro':
             maestro.render(base, user)
         elif user['role'] == 'Direcao':
