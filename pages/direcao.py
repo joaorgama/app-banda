@@ -303,7 +303,7 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                 novo_dia   = st.selectbox("Dia da Semana (Semanal/Período)", options=dias_opts)
                 novo_data  = st.date_input("Data / Data de Início*", value=date.today())
                 novo_data_fim = st.date_input(
-                    "Data de Fim (só para Período)",
+                    "Data de Fim (Semanal / Período)",
                     value=date.today() + timedelta(days=90)
                 )
 
@@ -321,7 +321,7 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                         "Local":            novo_local.strip(),
                         "Data":             str(novo_data),
                         "Dia da Semana":    novo_dia if novo_tipo in ('Semanal', 'Período') else "",
-                        "Data Fim":         str(novo_data_fim) if novo_tipo == 'Período' else "",
+                        "Data Fim":         str(novo_data_fim) if novo_tipo in ('Semanal', 'Período') else "",
                         "Datas Canceladas": "",
                     }
                     try:
@@ -386,7 +386,7 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                             dfim_val = datetime.strptime(dfim, '%Y-%m-%d').date() if dfim else date.today() + timedelta(days=90)
                         except Exception:
                             dfim_val = date.today() + timedelta(days=90)
-                        e_dfim = st.date_input("Data de Fim (Período)", value=dfim_val)
+                        e_dfim = st.date_input("Data de Fim (Semanal / Período)", value=dfim_val)
 
                     cs, cc = st.columns(2)
                     with cs:
@@ -406,7 +406,7 @@ def _render_gestao_ensaios(base, ensaios, faltas, musicos):
                                     "Local":         e_local.strip(),
                                     "Dia da Semana": e_dia if e_tipo in ('Semanal', 'Período') else "",
                                     "Data":          str(e_data),
-                                    "Data Fim":      str(e_dfim) if e_tipo == 'Período' else "",
+                                    "Data Fim":      str(e_dfim) if e_tipo in ('Semanal', 'Período') else "",
                                 })
                                 st.session_state[edit_key] = False
                                 st.success("✅ Ensaio atualizado!")
