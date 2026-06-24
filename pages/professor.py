@@ -182,7 +182,7 @@ def _render_presenca_aula(base, aula, data_dia, presencas_dict, card_bg, card_co
             f"{rec_str} 🕐 <b>{hora}</b> &nbsp;|&nbsp; "
             f"👤 <b>{aluno}</b> &nbsp;|&nbsp; 📍 {local}"
             + (f" &nbsp;|&nbsp; 🏫 {sala}" if sala else "")
-            f"</div>", unsafe_allow_html=True
+            + f"</div>", unsafe_allow_html=True
         )
     with col_badge:
         st.markdown(
@@ -284,7 +284,7 @@ def _render_presenca_aula(base, aula, data_dia, presencas_dict, card_bg, card_co
 
         st.divider()
 
-def _render_calendario(df_aulas, base=None):
+def _render_calendario(df_aulas, base=None, professor_nome=""):
     hoje = date.today()
     dark = st.session_state.get('dark_mode', True)
     card_bg, card_color = _card_styles()
@@ -410,6 +410,7 @@ def _render_calendario(df_aulas, base=None):
     st.divider()
     st.markdown("#### 🔍 Detalhe de um Dia & Presenças")
     dias_lista = sorted(aulas_por_dia.keys())
+    dia_sel = None
     if not dias_lista:
         st.info("Nenhuma aula encontrada neste mês com os filtros selecionados.")
     else:
@@ -432,12 +433,12 @@ def _render_calendario(df_aulas, base=None):
             if not professor_nome or _sv(a.get('Professor', '')) == professor_nome
         ]
 
-            st.markdown("---")
-            for aula in sorted(aulas_do_dia, key=lambda a: _hora_norm(a.get('Hora', ''))):
-                _render_presenca_aula(
-                    base, aula, data_sel_obj,
-                    presencas_dict, card_bg, card_color
-                )
+        st.markdown("---")
+        for aula in sorted(aulas_do_dia, key=lambda a: _hora_norm(a.get('Hora', ''))):
+            _render_presenca_aula(
+                base, aula, data_sel_obj,
+                presencas_dict, card_bg, card_color
+            )
 
 # ============================================
 # RENDER PRINCIPAL
@@ -765,7 +766,7 @@ def render(base, user):
     # ========================================
     with t4:
         st.subheader("📅 Calendário de Aulas")
-        _render_calendario(df_aulas_todas, base=base)
+        _render_calendario(df_aulas_todas, base=base, professor_nome=user['display_name'])
 
     # ========================================
     # TAB 5: REPORTÓRIO
