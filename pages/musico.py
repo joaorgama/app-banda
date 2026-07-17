@@ -131,6 +131,7 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
                 st.session_state['ens_ano'] = ano - 1
             else:
                 st.session_state['ens_mes'] = mes - 1
+            st.session_state['ens_dia_sel'] = None
             st.rerun()
     with col_titulo:
         st.markdown(
@@ -140,7 +141,7 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
         )
     with col_hoje_btn:
         if st.button("📅 Hoje", use_container_width=True, key="ens_hoje"):
-            st.session_state.update({'ens_ano': hoje.year, 'ens_mes': hoje.month})
+            st.session_state.update({'ens_ano': hoje.year, 'ens_mes': hoje.month, 'ens_dia_sel': None})
             st.rerun()
     with col_ref:
         if st.button("🔄", use_container_width=True, key="ens_refresh"):
@@ -152,17 +153,32 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
                 st.session_state['ens_ano'] = ano + 1
             else:
                 st.session_state['ens_mes'] = mes + 1
+            st.session_state['ens_dia_sel'] = None
             st.rerun()
 
     ensaios_por_dia = _get_ensaios_do_mes(ensaios, ano, mes)
 
-    # Set de faltas do músico neste mês: "EnsaioID_YYYY-MM-DD"
+    # Eventos do mês
+    try:
+        _todos_ev = get_eventos_cached()
+    except Exception:
+        _todos_ev = []
+    eventos_por_dia = {}
+    for _ev in _todos_ev:
+        try:
+            _d = datetime.strptime(str(_ev.get('Data', ''))[:10], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        if _d.year == ano and _d.month == mes:
+            eventos_por_dia.setdefault(_d.day, []).append(_ev)
+
+    # Set de faltas do músico
     faltas_set = set()
     for f in faltas:
         if _sv(f.get('Username', '')) == user['username']:
             faltas_set.add(f"{_sv(f.get('EnsaioID',''))}_{_sv(f.get('Data',''))[:10]}")
 
-    # ---- CSS e HTML do calendário ----
+    # ── CSS + HTML calendário visual ──
     cal_bg      = '#1e1e1e' if dark else '#ffffff'
     cal_border  = '#444'    if dark else '#ddd'
     cal_vazio   = '#2a2a2a' if dark else '#f5f5f5'
@@ -209,6 +225,12 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
                         label = f"{'❌' if tem_falta else '🥁'} {hora} {nome[:10]}"
                         html += (f'<span class="ens-pill" style="background:{cor}" '
                                  f'title="{nome}">{label}</span>')
+                if dia in eventos_por_dia:
+                    for ev in eventos_por_dia[dia]:
+                        nome_ev = ev.get('Nome do Evento', 'Evento')
+                        hora_ev = ev.get('Hora', '')
+                        html += (f'<span class="ens-pill" style="background:#3498db" '
+                                 f'title="{nome_ev}">📣 {hora_ev} {nome_ev[:8]}</span>')
                 html += '</td>'
         html += '</tr>'
     html += '</tbody></table>'
@@ -217,104 +239,171 @@ def _render_calendario_ensaios(base, ensaios, faltas, user):
     # Legenda
     st.markdown(
         "<div style='margin:6px 0;font-size:.8rem'>"
-        "<span style='background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;margin-right:8px'>"
-        "🥁 Ensaio</span>"
-        "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px'>"
-        "❌ Marquei falta</span></div>",
+        "<span style='background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;margin-right:6px'>🥁 Ensaio</span>"
+        "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;margin-right:6px'>❌ Falta</span>"
+        "<span style='background:#3498db;color:#fff;padding:2px 8px;border-radius:4px'>📣 Evento</span></div>",
         unsafe_allow_html=True
     )
 
-    # ---- Detalhe do dia ----
+    # ── Grelha interativa: clique num dia ──
     st.divider()
-    st.markdown("#### 🔍 Detalhe e Presenças")
+    st.markdown("#### 🖱️ Clique num dia para ver detalhes")
 
-    dias_lista = sorted(ensaios_por_dia.keys())
-    if not dias_lista:
-        st.info("Nenhum ensaio encontrado neste mês.")
-        return
+    if 'ens_dia_sel' not in st.session_state:
+        st.session_state['ens_dia_sel'] = None
 
-    dia_sel = st.selectbox(
-        "Selecionar dia:",
-        options=dias_lista,
-        format_func=lambda d: f"{d} de {_MESES_PT[mes]} — {len(ensaios_por_dia[d])} ensaio(s)",
-        key="ens_dia_detalhe"
-    )
+    hcols = st.columns(7)
+    for hcol, dname in zip(hcols, ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]):
+        hcol.markdown(
+            f"<p style='text-align:center;font-size:.75rem;font-weight:bold;"
+            f"color:#ff6b35;margin:2px 0'>{dname}</p>",
+            unsafe_allow_html=True
+        )
 
-    if dia_sel:
+    for semana in calendar.monthcalendar(ano, mes):
+        scols = st.columns(7)
+        for idx, (scol, dia) in enumerate(zip(scols, semana)):
+            with scol:
+                if dia == 0:
+                    st.write("")
+                else:
+                    tem_ens = dia in ensaios_por_dia
+                    tem_ev  = dia in eventos_por_dia
+                    is_hoje = date(ano, mes, dia) == hoje
+                    is_sel  = st.session_state.get('ens_dia_sel') == dia
+                    icons   = ("🥁" if tem_ens else "") + ("📣" if tem_ev else "")
+                    label   = f"{'◉ ' if is_hoje else ''}{dia}{' ' + icons if icons else ''}"
+                    if st.button(label, key=f"ens_{ano}_{mes}_{dia}",
+                                 use_container_width=True,
+                                 type="primary" if is_sel else "secondary"):
+                        st.session_state['ens_dia_sel'] = None if is_sel else dia
+                        st.rerun()
+
+    # ── Painel de detalhe ──
+    dia_sel = st.session_state.get('ens_dia_sel')
+    if dia_sel is None:
+        st.info("👆 Clique num dia para ver ensaios e eventos")
+    else:
         data_sel     = date(ano, mes, dia_sel)
         data_sel_str = data_sel.strftime('%Y-%m-%d')
+        st.markdown(f"### 📋 {dia_sel} de {_MESES_PT[mes]} de {ano}")
+        tem_conteudo = False
 
-        for e in sorted(ensaios_por_dia[dia_sel], key=lambda x: _hora_norm(x.get('Hora', ''))):
-            eid      = _sv(e.get('_id', ''))
-            hora     = _hora_norm(e.get('Hora', '---'))
-            nome     = _sv(e.get('Nome', 'Ensaio'))
-            tipo     = _sv(e.get('Tipo', ''))
-            local    = _sv(e.get('Local', ''))
-            falta_key = f"{eid}_{data_sel_str}"
-            tem_falta = falta_key in faltas_set
+        # Ensaios
+        if dia_sel in ensaios_por_dia:
+            tem_conteudo = True
+            st.markdown("**🥁 Ensaios:**")
+            for e in sorted(ensaios_por_dia[dia_sel], key=lambda x: _hora_norm(x.get('Hora', ''))):
+                eid       = _sv(e.get('_id', ''))
+                hora      = _hora_norm(e.get('Hora', '---'))
+                nome      = _sv(e.get('Nome', 'Ensaio'))
+                tipo      = _sv(e.get('Tipo', ''))
+                local     = _sv(e.get('Local', ''))
+                tem_falta = f"{eid}_{data_sel_str}" in faltas_set
+                tipo_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}.get(tipo, '🥁')
 
-            tipo_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}.get(tipo, '🥁')
+                st.markdown(
+                    f"<div style='border-left:4px solid #ff6b35;padding:8px 12px;margin:6px 0;"
+                    f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
+                    f"{tipo_icon} 🕐 <b>{hora}</b> &nbsp;|&nbsp; 🥁 <b>{nome}</b>"
+                    f"{'&nbsp;|&nbsp; 📍 ' + local if local else ''}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
 
-            st.markdown(
-                f"<div style='border-left:4px solid #ff6b35;padding:8px 12px;margin:6px 0;"
-                f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
-                f"{tipo_icon} 🕐 <b>{hora}</b> &nbsp;|&nbsp; 🥁 <b>{nome}</b>"
-                f"{'&nbsp;|&nbsp; 📍 ' + local if local else ''}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-
-            if tem_falta:
-                motivo_reg = ''
-                falta_row_id = None
-                for f in faltas:
-                    if (_sv(f.get('Username', '')) == user['username'] and
-                            _sv(f.get('EnsaioID', '')) == eid and
-                            _sv(f.get('Data', ''))[:10] == data_sel_str):
-                        motivo_reg   = _sv(f.get('Motivo', ''))
-                        falta_row_id = f.get('_id')
-                        break
-
-                st.warning(f"❌ Marcaste falta{f' — *{motivo_reg}*' if motivo_reg else ''}")
-                if st.button("↩️ Cancelar falta", key=f"cancel_{eid}_{data_sel_str}",
-                             use_container_width=True):
-                    if falta_row_id:
-                        try:
-                            base.delete_row("Faltas_Ensaios", falta_row_id)
-                            get_faltas_ensaios_cached.clear()
-                            st.success("✅ Falta cancelada!")
-                            st.rerun()
-                        except Exception as ex:
-                            st.error(f"Erro: {ex}")
-            else:
-                if data_sel < hoje:
-                    st.info("✅ Ensaio já decorreu")
+                if tem_falta:
+                    motivo_reg, falta_row_id = '', None
+                    for f in faltas:
+                        if (_sv(f.get('Username', '')) == user['username'] and
+                                _sv(f.get('EnsaioID', '')) == eid and
+                                _sv(f.get('Data', ''))[:10] == data_sel_str):
+                            motivo_reg   = _sv(f.get('Motivo', ''))
+                            falta_row_id = f.get('_id')
+                            break
+                    st.warning(f"❌ Marcaste falta{f' — *{motivo_reg}*' if motivo_reg else ''}")
+                    if st.button("↩️ Cancelar falta", key=f"cancel_{eid}_{data_sel_str}",
+                                 use_container_width=True):
+                        if falta_row_id:
+                            try:
+                                base.delete_row("Faltas_Ensaios", falta_row_id)
+                                get_faltas_ensaios_cached.clear()
+                                st.success("✅ Falta cancelada!")
+                                st.rerun()
+                            except Exception as ex:
+                                st.error(f"Erro: {ex}")
                 else:
-                    with st.expander("⚠️ Não posso ir a este ensaio"):
-                        with st.form(f"form_falta_{eid}_{data_sel_str}"):
-                            motivo_input = st.text_input(
-                                "Motivo (opcional)",
-                                placeholder="Ex: trabalho, viagem...",
-                                key=f"mot_{eid}_{data_sel_str}"
-                            )
-                            if st.form_submit_button("✉️ Confirmar falta", use_container_width=True,
-                                                     type="primary"):
-                                try:
-                                    base.append_row("Faltas_Ensaios", {
-                                        "EnsaioID": eid,
-                                        "Data":     data_sel_str,
-                                        "Username": user['username'],
-                                        "Motivo":   motivo_input.strip(),
-                                    })
-                                    get_faltas_ensaios_cached.clear()
-                                    st.success("✅ Falta registada!")
-                                    st.rerun()
-                                except Exception as ex:
-                                    st.error(f"Erro: {ex}")
+                    if data_sel < hoje:
+                        st.info("✅ Ensaio já decorreu")
+                    else:
+                        with st.expander("⚠️ Não posso ir a este ensaio"):
+                            with st.form(f"form_falta_{eid}_{data_sel_str}"):
+                                motivo_input = st.text_input(
+                                    "Motivo (opcional)",
+                                    placeholder="Ex: trabalho, viagem...",
+                                    key=f"mot_{eid}_{data_sel_str}"
+                                )
+                                if st.form_submit_button("✉️ Confirmar falta",
+                                                         use_container_width=True, type="primary"):
+                                    try:
+                                        base.append_row("Faltas_Ensaios", {
+                                            "EnsaioID": eid,
+                                            "Data":     data_sel_str,
+                                            "Username": user['username'],
+                                            "Motivo":   motivo_input.strip(),
+                                        })
+                                        get_faltas_ensaios_cached.clear()
+                                        st.success("✅ Falta registada!")
+                                        st.rerun()
+                                    except Exception as ex:
+                                        st.error(f"Erro: {ex}")
 
-    # ---- Métricas ----
+        # Eventos
+        if dia_sel in eventos_por_dia:
+            tem_conteudo = True
+            if dia_sel in ensaios_por_dia:
+                st.markdown("---")
+            st.markdown("**📣 Eventos:**")
+            presencas = get_presencas_cached()
+            for ev in eventos_por_dia[dia_sel]:
+                nome_ev = ev.get('Nome do Evento', 'Evento')
+                hora_ev = ev.get('Hora', '---')
+                tipo_ev = ev.get('Tipo', '---')
+                desc_ev = ev.get('Descricao', '')
+                resp_atual = next(
+                    (p['Resposta'] for p in presencas
+                     if p.get('EventoID') == ev['_id'] and p.get('Username') == user['username']),
+                    "Pendente"
+                )
+                badge = {'Vou': '✅', 'Não Vou': '❌', 'Talvez': '❓'}.get(resp_atual, '⏳')
+                st.markdown(
+                    f"<div style='border-left:4px solid #3498db;padding:8px 12px;margin:6px 0;"
+                    f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
+                    f"📣 🕐 <b>{hora_ev}</b> &nbsp;|&nbsp; <b>{nome_ev}</b>"
+                    f"&nbsp;|&nbsp; {tipo_ev} &nbsp;|&nbsp; {badge} {resp_atual}"
+                    f"{'<br><i>' + desc_ev + '</i>' if desc_ev else ''}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                c1, c2, c3 = st.columns(3)
+                if c1.button("✅ Vou", key=f"ev_vou_{ev['_id']}_{dia_sel}", use_container_width=True):
+                    if add_presenca(base, ev['_id'], user['username'], "Vou"):
+                        get_presencas_cached.clear()
+                        st.rerun()
+                if c2.button("❌ Não Vou", key=f"ev_nao_{ev['_id']}_{dia_sel}", use_container_width=True):
+                    if add_presenca(base, ev['_id'], user['username'], "Não Vou"):
+                        get_presencas_cached.clear()
+                        st.rerun()
+                if c3.button("❓ Talvez", key=f"ev_talvez_{ev['_id']}_{dia_sel}", use_container_width=True):
+                    if add_presenca(base, ev['_id'], user['username'], "Talvez"):
+                        get_presencas_cached.clear()
+                        st.rerun()
+
+        if not tem_conteudo:
+            st.info("Nenhum ensaio ou evento neste dia")
+
+    # ── Métricas ──
     st.divider()
-    total_mes = sum(len(v) for v in ensaios_por_dia.values())
+    total_mes  = sum(len(v) for v in ensaios_por_dia.values())
     faltas_mes = sum(
         1 for f in faltas
         if _sv(f.get('Username', '')) == user['username']
@@ -392,7 +481,6 @@ def render(base, user):
                     [e for e in eventos if _data_sort(e) >= hoje_ev],
                     key=_data_sort
                 )
-
                 if not eventos:
                     st.info("📭 Nenhum evento agendado no momento")
 
