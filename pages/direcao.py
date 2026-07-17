@@ -129,6 +129,7 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
                 st.session_state['adm_ens_ano'] = ano - 1
             else:
                 st.session_state['adm_ens_mes'] = mes - 1
+            st.session_state['adm_dia_sel'] = None
             st.rerun()
     with col_titulo:
         st.markdown(
@@ -138,7 +139,7 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
         )
     with col_hoje_btn:
         if st.button("📅 Hoje", use_container_width=True, key="adm_ens_hoje"):
-            st.session_state.update({'adm_ens_ano': hoje.year, 'adm_ens_mes': hoje.month})
+            st.session_state.update({'adm_ens_ano': hoje.year, 'adm_ens_mes': hoje.month, 'adm_dia_sel': None})
             st.rerun()
     with col_ref:
         if st.button("🔄", use_container_width=True, key="adm_ens_refresh"):
@@ -150,10 +151,26 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
                 st.session_state['adm_ens_ano'] = ano + 1
             else:
                 st.session_state['adm_ens_mes'] = mes + 1
+            st.session_state['adm_dia_sel'] = None
             st.rerun()
 
     ensaios_por_dia = _get_ensaios_do_mes(ensaios, ano, mes)
 
+    # Eventos do mês
+    try:
+        _todos_ev = get_eventos_cached()
+    except Exception:
+        _todos_ev = []
+    eventos_por_dia = {}
+    for _ev in _todos_ev:
+        try:
+            _d = datetime.strptime(str(_ev.get('Data', ''))[:10], '%Y-%m-%d').date()
+        except Exception:
+            continue
+        if _d.year == ano and _d.month == mes:
+            eventos_por_dia.setdefault(_d.day, []).append(_ev)
+
+    # ── CSS + HTML calendário visual ──
     cal_bg      = '#1e1e1e' if dark else '#ffffff'
     cal_border  = '#444'    if dark else '#ddd'
     cal_vazio   = '#2a2a2a' if dark else '#f5f5f5'
@@ -201,89 +218,187 @@ def _render_calendario_ensaios_admin(base, ensaios, faltas, musicos):
                         )
                         badge = f" ⚠️{n_faltas}" if n_faltas > 0 else ""
                         html += (f'<span class="adm-pill" style="background:#ff6b35" '
-                                 f'title="{nome}">'
-                                 f'🥁 {hora} {nome[:8]}{badge}</span>')
+                                 f'title="{nome}">🥁 {hora} {nome[:8]}{badge}</span>')
+                if dia in eventos_por_dia:
+                    for ev in eventos_por_dia[dia]:
+                        nome_ev = ev.get('Nome do Evento', 'Evento')
+                        hora_ev = ev.get('Hora', '')
+                        html += (f'<span class="adm-pill" style="background:#3498db" '
+                                 f'title="{nome_ev}">📣 {hora_ev} {nome_ev[:8]}</span>')
                 html += '</td>'
         html += '</tr>'
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
 
-    st.divider()
-    st.markdown("#### 🔍 Detalhe do Dia")
-    dias_lista = sorted(ensaios_por_dia.keys())
-    if not dias_lista:
-        st.info("Nenhum ensaio neste mês.")
-        return
-
-    dia_sel = st.selectbox(
-        "Selecionar dia:",
-        options=dias_lista,
-        format_func=lambda d: f"{d} de {_MESES_PT[mes]} — {len(ensaios_por_dia[d])} ensaio(s)",
-        key="adm_ens_dia"
+    # Legenda
+    st.markdown(
+        "<div style='margin:6px 0;font-size:.8rem'>"
+        "<span style='background:#ff6b35;color:#fff;padding:2px 8px;border-radius:4px;margin-right:6px'>🥁 Ensaio</span>"
+        "<span style='background:#3498db;color:#fff;padding:2px 8px;border-radius:4px'>📣 Evento</span></div>",
+        unsafe_allow_html=True
     )
 
-    if dia_sel:
+    # ── Grelha interativa ──
+    st.divider()
+    st.markdown("#### 🖱️ Clique num dia para gerir")
+
+    if 'adm_dia_sel' not in st.session_state:
+        st.session_state['adm_dia_sel'] = None
+
+    hcols = st.columns(7)
+    for hcol, dname in zip(hcols, ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]):
+        hcol.markdown(
+            f"<p style='text-align:center;font-size:.75rem;font-weight:bold;"
+            f"color:#ff6b35;margin:2px 0'>{dname}</p>",
+            unsafe_allow_html=True
+        )
+
+    for semana in calendar.monthcalendar(ano, mes):
+        scols = st.columns(7)
+        for idx, (scol, dia) in enumerate(zip(scols, semana)):
+            with scol:
+                if dia == 0:
+                    st.write("")
+                else:
+                    tem_ens = dia in ensaios_por_dia
+                    tem_ev  = dia in eventos_por_dia
+                    is_hoje = date(ano, mes, dia) == hoje
+                    is_sel  = st.session_state.get('adm_dia_sel') == dia
+                    icons   = ("🥁" if tem_ens else "") + ("📣" if tem_ev else "")
+                    label   = f"{'◉ ' if is_hoje else ''}{dia}{' ' + icons if icons else ''}"
+                    if st.button(label, key=f"adm_{ano}_{mes}_{dia}",
+                                 use_container_width=True,
+                                 type="primary" if is_sel else "secondary"):
+                        st.session_state['adm_dia_sel'] = None if is_sel else dia
+                        st.rerun()
+
+    # ── Painel de detalhe / gestão ──
+    dia_sel = st.session_state.get('adm_dia_sel')
+    if dia_sel is None:
+        st.info("👆 Clique num dia para gerir ensaios e eventos")
+    else:
         data_sel     = date(ano, mes, dia_sel)
         data_sel_str = data_sel.strftime('%Y-%m-%d')
+        st.markdown(f"### 📋 {dia_sel} de {_MESES_PT[mes]} de {ano}")
+        tem_conteudo = False
 
-        for e in sorted(ensaios_por_dia[dia_sel], key=lambda x: _hora_norm(x.get('Hora', ''))):
-            eid   = _sv(e.get('_id', ''))
-            hora  = _hora_norm(e.get('Hora', '---'))
-            nome  = _sv(e.get('Nome', 'Ensaio'))
-            tipo  = _sv(e.get('Tipo', ''))
-            local = _sv(e.get('Local', ''))
-            tipo_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}.get(tipo, '🥁')
+        # Ensaios
+        if dia_sel in ensaios_por_dia:
+            tem_conteudo = True
+            st.markdown("**🥁 Ensaios:**")
+            for e in sorted(ensaios_por_dia[dia_sel], key=lambda x: _hora_norm(x.get('Hora', ''))):
+                eid   = _sv(e.get('_id', ''))
+                hora  = _hora_norm(e.get('Hora', '---'))
+                nome  = _sv(e.get('Nome', 'Ensaio'))
+                tipo  = _sv(e.get('Tipo', ''))
+                local = _sv(e.get('Local', ''))
+                tipo_icon = {'Semanal': '🔁', 'Período': '📆', 'Pontual': '📌'}.get(tipo, '🥁')
 
-            st.markdown(
-                f"<div style='border-left:4px solid #ff6b35;padding:8px 12px;margin:6px 0;"
-                f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
-                f"{tipo_icon} 🕐 <b>{hora}</b> &nbsp;|&nbsp; 🥁 <b>{nome}</b>"
-                f"{'&nbsp;|&nbsp; 📍 ' + local if local else ''}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+                st.markdown(
+                    f"<div style='border-left:4px solid #ff6b35;padding:8px 12px;margin:6px 0;"
+                    f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
+                    f"{tipo_icon} 🕐 <b>{hora}</b> &nbsp;|&nbsp; 🥁 <b>{nome}</b>"
+                    f"{'&nbsp;|&nbsp; 📍 ' + local if local else ''}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
 
-            faltas_dia = [
-                f for f in faltas
-                if _sv(f.get('EnsaioID', '')) == eid
-                and _sv(f.get('Data', ''))[:10] == data_sel_str
-            ]
+                faltas_dia = [f for f in faltas
+                              if _sv(f.get('EnsaioID', '')) == eid
+                              and _sv(f.get('Data', ''))[:10] == data_sel_str]
+                if faltas_dia:
+                    st.markdown(f"**⚠️ {len(faltas_dia)} músico(s) registaram falta:**")
+                    for f in faltas_dia:
+                        username = _sv(f.get('Username', ''))
+                        motivo   = _sv(f.get('Motivo', ''))
+                        nome_mus = next((m.get('Nome', username) for m in musicos
+                                         if str(m.get('Username', '')).lower() == username.lower()), username)
+                        st.markdown(
+                            f"<div style='padding:4px 10px;margin:2px 0;background:#e74c3c22;"
+                            f"border-radius:6px;border-left:3px solid #e74c3c;color:{card_color}'>"
+                            f"❌ <b>{nome_mus}</b>{'  — ' + motivo if motivo else ''}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.success("✅ Sem faltas registadas para este ensaio")
 
-            if faltas_dia:
-                st.markdown(f"**⚠️ {len(faltas_dia)} músico(s) registaram falta:**")
-                for f in faltas_dia:
-                    username = _sv(f.get('Username', ''))
-                    motivo   = _sv(f.get('Motivo', ''))
-                    nome_mus = username
-                    for m in musicos:
-                        if str(m.get('Username', '')).lower() == username.lower():
-                            nome_mus = m.get('Nome', username)
-                            break
-                    st.markdown(
-                        f"<div style='padding:4px 10px;margin:2px 0;background:#e74c3c22;"
-                        f"border-radius:6px;border-left:3px solid #e74c3c;color:{card_color}'>"
-                        f"❌ <b>{nome_mus}</b>"
-                        f"{'  — ' + motivo if motivo else ''}"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
-            else:
-                st.success("✅ Sem faltas registadas para este ensaio")
+                if tipo in ('Semanal', 'Período'):
+                    if st.button(f"🚫 Cancelar ensaio de {dia_sel} {_MESES_PT[mes]}",
+                                 key=f"cancel_dia_{eid}_{data_sel_str}", use_container_width=True):
+                        try:
+                            datas_cancel = _datas_canceladas(e)
+                            datas_cancel.add(data_sel_str)
+                            base.update_row("Ensaios", eid, {
+                                "Datas Canceladas": ", ".join(sorted(datas_cancel))
+                            })
+                            st.success(f"✅ Ensaio de {data_sel_str} cancelado!")
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"Erro: {ex}")
 
-            if tipo in ('Semanal', 'Período'):
-                cancel_key = f"cancel_dia_{eid}_{data_sel_str}"
-                if st.button(f"🚫 Cancelar ensaio de {dia_sel} {_MESES_PT[mes]}",
-                             key=cancel_key, use_container_width=True):
-                    try:
-                        datas_cancel = _datas_canceladas(e)
-                        datas_cancel.add(data_sel_str)
-                        base.update_row("Ensaios", eid, {
-                            "Datas Canceladas": ", ".join(sorted(datas_cancel))
-                        })
-                        st.success(f"✅ Ensaio de {data_sel_str} cancelado!")
+        # Eventos
+        if dia_sel in eventos_por_dia:
+            tem_conteudo = True
+            if dia_sel in ensaios_por_dia:
+                st.markdown("---")
+            st.markdown("**📣 Eventos:**")
+            presencas = get_presencas_cached()
+            for ev in eventos_por_dia[dia_sel]:
+                nome_ev = ev.get('Nome do Evento', 'Evento')
+                hora_ev = ev.get('Hora', '---')
+                tipo_ev = ev.get('Tipo', '---')
+                desc_ev = ev.get('Descricao', '')
+                vao_ev  = len([p for p in presencas if p.get('EventoID') == ev['_id'] and p.get('Resposta') == 'Vou'])
+                st.markdown(
+                    f"<div style='border-left:4px solid #3498db;padding:8px 12px;margin:6px 0;"
+                    f"background:{card_bg};border-radius:0 8px 8px 0;color:{card_color};'>"
+                    f"📣 🕐 <b>{hora_ev}</b> &nbsp;|&nbsp; <b>{nome_ev}</b>"
+                    f"&nbsp;|&nbsp; {tipo_ev} &nbsp;|&nbsp; ✅ {vao_ev} confirmados"
+                    f"{'<br><i>' + desc_ev + '</i>' if desc_ev else ''}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                # Botão editar evento direto do calendário
+                edit_cal_key = f"adm_cal_edit_{ev['_id']}"
+                if st.session_state.get(edit_cal_key):
+                    with st.form(f"form_cal_edit_{ev['_id']}"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            nome_e = st.text_input("Nome*", value=nome_ev)
+                            hora_e = st.text_input("Hora*", value=hora_ev)
+                        with c2:
+                            tipos  = ["Concerto", "Ensaio", "Actuação", "Outro"]
+                            tipo_e = st.selectbox("Tipo", tipos,
+                                                   index=tipos.index(tipo_ev) if tipo_ev in tipos else 0)
+                            desc_e = st.text_area("Descrição", value=desc_ev)
+                        cs, cc = st.columns(2)
+                        with cs:
+                            if st.form_submit_button("💾 Guardar", use_container_width=True, type="primary"):
+                                try:
+                                    base.update_row("Eventos", ev['_id'], {
+                                        "Nome do Evento": nome_e,
+                                        "Hora": hora_e,
+                                        "Tipo": tipo_e,
+                                        "Descricao": desc_e,
+                                    })
+                                    get_eventos_cached.clear()
+                                    st.session_state[edit_cal_key] = False
+                                    st.success("✅ Evento atualizado!")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Erro: {ex}")
+                        with cc:
+                            if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                                st.session_state[edit_cal_key] = False
+                                st.rerun()
+                else:
+                    if st.button(f"✏️ Editar evento", key=f"adm_cal_editbtn_{ev['_id']}",
+                                 use_container_width=True):
+                        st.session_state[edit_cal_key] = True
                         st.rerun()
-                    except Exception as ex:
-                        st.error(f"Erro: {ex}")
+
+        if not tem_conteudo:
+            st.info("Nenhum ensaio ou evento neste dia")
 
 
 def _render_gestao_ensaios(base, ensaios, faltas, musicos):
@@ -594,13 +709,12 @@ def render(base, user):
                     f"📚 Histórico ({len(eventos_passados)})",
                 ])
 
-                # ── ABA: PRÓXIMOS ──────────────────────────────
+                # ── ABA PRÓXIMOS ─────────────────────────────
                 with _tab_prox:
                     if not eventos_futuros:
                         st.info("📭 Nenhum evento agendado")
                     else:
                         st.write(f"**{len(eventos_futuros)} evento(s) agendado(s)**")
-
                         for e in eventos_futuros:
                             with st.expander(f"📝 {e.get('Nome do Evento')} - {formatar_data_pt(e.get('Data'))}"):
                                 edit_key = f"edit_mode_{e['_id']}"
@@ -627,13 +741,11 @@ def render(base, user):
                                             tipo_edit  = st.selectbox("Tipo", tipos, index=tipo_idx)
                                         descricao_edit = st.text_area("Descrição", value=e.get('Descricao', ''))
                                         cartaz_edit    = st.text_input("URL do Cartaz", value=e.get('Cartaz', ''))
-
                                         col_save, col_cancel = st.columns(2)
                                         with col_save:
                                             guardar  = st.form_submit_button("💾 Guardar Alterações", use_container_width=True, type="primary")
                                         with col_cancel:
                                             cancelar = st.form_submit_button("❌ Cancelar", use_container_width=True)
-
                                         if guardar:
                                             if not nome_edit or not hora_edit:
                                                 st.error("⚠️ Preencha todos os campos obrigatórios")
@@ -656,7 +768,6 @@ def render(base, user):
                                         if cancelar:
                                             st.session_state[edit_key] = False
                                             st.rerun()
-
                                 else:
                                     col1, col2, col3 = st.columns([2, 2, 1])
                                     with col1:
@@ -687,7 +798,6 @@ def render(base, user):
                                                 st.error(f"Erro: {e_error}")
 
                                     st.divider()
-
                                     if musicos:
                                         st.subheader("🎼 Presenças por Músico")
                                         pres_evento    = [p for p in presencas if p.get('EventoID') == e['_id']]
@@ -696,7 +806,6 @@ def render(base, user):
                                             username_p = p.get('Username')
                                             if username_p:
                                                 respostas_dict[str(username_p).lower().strip()] = p.get('Resposta')
-
                                         lista_musicos = []
                                         for m in musicos:
                                             username_raw    = m.get('Username')
@@ -708,9 +817,7 @@ def render(base, user):
                                                 'Instrumento': instrumento,
                                                 'Resposta':    respostas_dict.get(username, 'Pendente')
                                             })
-
                                         df_musicos = pd.DataFrame(lista_musicos).sort_values(['Instrumento', 'Nome'])
-
                                         col_filtro1, col_filtro2 = st.columns([2, 2])
                                         with col_filtro1:
                                             filtro_resposta = st.multiselect(
@@ -723,12 +830,9 @@ def render(base, user):
                                             inst_def   = df_musicos[df_musicos['Instrumento'] != 'Não definido']
                                             num_naipes = len(inst_def['Instrumento'].unique()) if not inst_def.empty else 0
                                             st.caption(f"📊 Naipes definidos: {num_naipes}")
-
                                         df_filtrado = df_musicos[df_musicos['Resposta'].isin(filtro_resposta)].copy()
-
                                         def add_emoji(r):
                                             return {'Vou': '✅ Vou', 'Não Vou': '❌ Não Vou', 'Talvez': '❓ Talvez'}.get(r, '⏳ Pendente')
-
                                         df_filtrado['Estado'] = df_filtrado['Resposta'].apply(add_emoji)
                                         st.dataframe(
                                             df_filtrado[['Nome', 'Instrumento', 'Estado']],
@@ -739,7 +843,6 @@ def render(base, user):
                                                 "Estado":      st.column_config.TextColumn("📋 Resposta",    width="medium")
                                             }
                                         )
-
                                         instrumentos_validos = df_musicos[df_musicos['Instrumento'] != 'Não definido']
                                         if not instrumentos_validos.empty:
                                             st.divider()
@@ -766,22 +869,19 @@ def render(base, user):
                                     else:
                                         st.info("Nenhum músico registado no sistema")
 
-                # ── ABA: HISTÓRICO ─────────────────────────────
+                # ── ABA HISTÓRICO ─────────────────────────────
                 with _tab_hist:
                     if not eventos_passados:
                         st.info("📭 Nenhum evento passado registado")
                     else:
                         st.caption(f"**{len(eventos_passados)} evento(s) no histórico** — apenas leitura")
                         for e in reversed(eventos_passados):
-                            data_str = formatar_data_pt(e.get('Data'))
-                            nome_ev  = e.get('Nome do Evento', 'Sem nome')
-                            tipo_ev  = e.get('Tipo', '---')
-                            with st.expander(f"📋 {data_str} — {nome_ev}"):
+                            with st.expander(f"📋 {formatar_data_pt(e.get('Data'))} — {e.get('Nome do Evento', 'Sem nome')}"):
                                 hc1, hc2, hc3 = st.columns([2, 2, 1])
                                 with hc1:
-                                    st.write(f"**Data:** {data_str}")
+                                    st.write(f"**Data:** {formatar_data_pt(e.get('Data'))}")
                                     st.write(f"**Hora:** {e.get('Hora', '---')}")
-                                    st.write(f"**Tipo:** {tipo_ev}")
+                                    st.write(f"**Tipo:** {e.get('Tipo', '---')}")
                                     if e.get('Descricao'):
                                         st.write(f"**Descrição:** {e.get('Descricao')}")
                                     if e.get('Cartaz'):
@@ -792,7 +892,7 @@ def render(base, user):
                                     nao_h    = len([p for p in pres_h if p.get('Resposta') == 'Não Vou'])
                                     talvez_h = len([p for p in pres_h if p.get('Resposta') == 'Talvez'])
                                     st.metric("✅ Foram", vao_h)
-                                    st.caption(f"❌ Não foram: {nao_h} | ❓ Talvez: {talvez_h} | Total respostas: {vao_h + nao_h + talvez_h}")
+                                    st.caption(f"❌ Não foram: {nao_h} | ❓ Talvez: {talvez_h}")
                                 with hc3:
                                     _del_key = f"del_hist_{e['_id']}"
                                     if st.session_state.get(_del_key):
