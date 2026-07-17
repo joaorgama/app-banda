@@ -766,7 +766,7 @@ def render(base, user):
     # ========================================
     with t4:
         st.subheader("📅 Calendário de Aulas")
-        _render_calendario(df_aulas_todas, base=base)
+        _render_calendario(df_aulas_todas, base=base, professor_nome=user['display_name'])
 
     # ========================================
     # TAB 5: REPORTÓRIO
